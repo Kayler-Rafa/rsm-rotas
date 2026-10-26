@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "rsm",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["src/server.py", "8000"],
+      "port": 8000
+    },
+    {
+      "name": "rsm-8010",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["src/server.py", "8010"],
+      "port": 8010
+    }
+  ]
+}

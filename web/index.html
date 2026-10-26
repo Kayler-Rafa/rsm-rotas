@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="escuro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>RSM</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<div id="app">
+  <div id="mapa"></div>
+
+  <div class="aviso-tiles">Mapa base bloqueado aqui — o traçado continua correto.</div>
+  <button class="flutuante" id="btnMarca" type="button">RSM</button>
+  <button class="flutuante" id="btnTema" type="button" aria-label="Alternar tema"></button>
+  <button class="flutuante" id="btnCentro" type="button" aria-label="Centralizar no trajeto">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8"/>
+      <path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>
+    </svg>
+  </button>
+
+  <section class="folha" id="folha">
+    <div class="pega" id="pega"><span></span></div>
+
+    <div class="folha-rolagem" id="rolagem">
+      <div class="busca">
+        <div class="rail"><span class="o"></span><span class="fio"></span><span class="d"></span></div>
+        <div class="campos">
+          <label class="campo"><select id="selOrigem" aria-label="De onde"></select></label>
+          <label class="campo"><select id="selDestino" aria-label="Para onde"></select></label>
+        </div>
+        <button class="btn-trocar" id="btnTrocar" type="button" aria-label="Inverter origem e destino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="condicoes" id="condicoes"></div>
+
+      <div class="cabeca">
+        <h1>Escolha a viagem</h1>
+        <p class="sugestao" id="sugestao"></p>
+      </div>
+
+      <ul class="opcoes" id="opcoes"></ul>
+
+      <button class="acessivel" id="btnAcessivel" type="button" aria-pressed="false">
+        <span class="rot">Preciso de rota acessível</span>
+        <span class="chave"></span>
+      </button>
+    </div>
+
+    <div class="folha-pe">
+      <button class="cta" id="cta" type="button">
+        <span class="cta-n" id="ctaNome"></span>
+        <span class="cta-p" id="ctaPreco"></span>
+      </button>
+      <div class="mini">
+        <span>Tempos e preços são estimativa.</span>
+        <a href="/admin">Tela técnica</a>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="carregando" class="carregando" hidden><div class="spinner"></div></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

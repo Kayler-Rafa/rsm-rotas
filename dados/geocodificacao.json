@@ -1,0 +1,149 @@
+{
+ "se_olinda": {
+  "lat": -23.3203067,
+  "lon": -46.7241331,
+  "erro_m": 2122130,
+  "nome_osm": "Igreja do Evangelho Quadrangular, Avenida Israel, Jardim Cedro do Líba"
+ },
+ "bonfim": {
+  "lat": -8.015009,
+  "lon": -34.8506008,
+  "erro_m": 133,
+  "nome_osm": "Rua do Bonfim, Carmo, Olinda, Pernambuco, Região Nordeste, 53020-460, "
+ },
+ "carmo": {
+  "lat": -8.0170337,
+  "lon": -34.8483559,
+  "erro_m": 405,
+  "nome_osm": "Praça do Carmo, Carmo, Olinda, Pernambuco, Região Nordeste, Brasil"
+ },
+ "carlos_lima": {
+  "lat": -7.9730049,
+  "lon": -34.833734,
+  "erro_m": 7460,
+  "nome_osm": "Avenida Governador Carlos de Lima Cavalcanti, Rio Doce, Olinda, Pernam"
+ },
+ "cruz_cabuga": {
+  "lat": -8.0416265,
+  "lon": -34.8726585,
+  "erro_m": 643,
+  "nome_osm": "Avenida Cruz Cabugá, Santo Amaro, Recife, Pernambuco, Região Nordeste,"
+ },
+ "agamenon": {
+  "lat": -8.0563124,
+  "lon": -34.8991373,
+  "erro_m": 1114,
+  "nome_osm": "Praça do Derby, Derby, Recife, Pernambuco, Região Nordeste, 52010-140,"
+ },
+ "recife_antigo": {
+  "lat": -8.063374,
+  "lon": -34.8709722,
+  "erro_m": 71,
+  "nome_osm": "Marco Zero, Avenida Alfredo Lisboa, Bairro do Recife, Recife, Pernambu"
+ },
+ "est_recife": null,
+ "sto_antonio": {
+  "lat": -8.066974,
+  "lon": -34.8795079,
+  "erro_m": 232,
+  "nome_osm": "Avenida Dantas Barreto, Santo Antônio, Recife, Pernambuco, Região Nord"
+ },
+ "jose_estelita": {
+  "lat": -8.0751742,
+  "lon": -34.8870196,
+  "erro_m": 625,
+  "nome_osm": "Cais José Estelita, São José, Recife, Pernambuco, Região Nordeste, 500"
+ },
+ "joana_bezerra": {
+  "lat": -8.0732099,
+  "lon": -34.8953949,
+  "erro_m": 677,
+  "nome_osm": "Joana Bezerra, Avenida Central, São José, Recife, Pernambuco, Região N"
+ },
+ "brasilia_teimosa": {
+  "lat": -8.0827799,
+  "lon": -34.8789567,
+  "erro_m": 605,
+  "nome_osm": "Brasília Teimosa, Recife, Pernambuco, Região Nordeste, Brasil"
+ },
+ "pina": {
+  "lat": -8.0963033,
+  "lon": -34.8946884,
+  "erro_m": 1287,
+  "nome_osm": "Pina, Recife, Pernambuco, Região Nordeste, Brasil"
+ },
+ "bv_norte": {
+  "lat": -8.1188627,
+  "lon": -34.8942664,
+  "erro_m": 773,
+  "nome_osm": "Avenida Boa Viagem, Boa Viagem, Recife, Pernambuco, Região Nordeste, 5"
+ },
+ "praca_bv": {
+  "lat": -8.1317036,
+  "lon": -34.9013821,
+  "erro_m": 583,
+  "nome_osm": "Praça de Boa Viagem, Avenida Conselheiro Aguiar, Boa Viagem, Recife, P"
+ },
+ "setubal": {
+  "lat": -8.1528882,
+  "lon": -34.9102334,
+  "erro_m": 947,
+  "nome_osm": "Canal de Setúbal, Boa Viagem, Recife, Pernambuco, Região Nordeste, 544"
+ },
+ "imbiribeira": {
+  "lat": -8.090517,
+  "lon": -34.907617,
+  "erro_m": 1900,
+  "nome_osm": "Estação Imbiribeira, Rua Doutor Valdir Pessoa, Imbiribeira, Recife, Pe"
+ },
+ "largo_paz": {
+  "lat": -8.0813746,
+  "lon": -34.904784,
+  "erro_m": 4043,
+  "nome_osm": "Largo da Paz, Avenida Sul, Afogados, Recife, Pernambuco, Região Nordes"
+ },
+ "mascarenhas": null,
+ "antonio_falcao": {
+  "lat": -8.1099303,
+  "lon": -34.9090556,
+  "erro_m": 1744,
+  "nome_osm": "Antônio Falcão, Avenida General Mac Artur, Vila Rua Antônio Eduardo Am"
+ },
+ "shopping": {
+  "lat": -8.1162947,
+  "lon": -34.9105425,
+  "erro_m": 1710,
+  "nome_osm": "Shopping, Passarela da Estação Shopping, Imbiribeira, Recife, Pernambu"
+ },
+ "aeroporto": {
+  "lat": -8.1341737,
+  "lon": -34.9146661,
+  "erro_m": 912,
+  "nome_osm": "Aeroporto, TI Aeroporto, Loteamento dos Terrenos, Boa Viagem, Recife, "
+ },
+ "tancredo_neves": {
+  "lat": -8.1225121,
+  "lon": -34.9118978,
+  "erro_m": 3310,
+  "nome_osm": "Tancredo Neves, Avenida Sul, Imbiribeira, Recife, Pernambuco, Região N"
+ },
+ "prazeres": {
+  "lat": -8.1611032,
+  "lon": -34.9267699,
+  "erro_m": 851,
+  "nome_osm": "Prazeres, Terminal Integrado Prazeres, Prazeres, Jaboatão dos Guararap"
+ },
+ "piedade_orla": {
+  "lat": -8.2050272,
+  "lon": -34.917659,
+  "erro_m": 4494,
+  "nome_osm": "Avenida Bernardo Vieira de Melo, Candeias, Jaboatão dos Guararapes, Pe"
+ },
+ "cajueiro_seco": {
+  "lat": -8.1677132,
+  "lon": -34.9341184,
+  "erro_m": 1088,
+  "nome_osm": "Terminal Integrado Cajueiro Seco, Prazeres, Jaboatão dos Guararapes, P"
+ },
+ "igreja_piedade": null
+}

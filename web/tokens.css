@@ -1,0 +1,104 @@
+/* Tokens de cor e reset, compartilhados pelo app (/) e pela tela tecnica (/admin).
+   O tema segue a preferencia do sistema e pode ser trocado a mao: o atributo
+   data-tema no <html> vence a media query. */
+
+:root {
+  --bg: #f6f7f9;
+  --superficie: #ffffff;
+  --superficie-2: #f0f2f5;
+  --borda: #e3e6eb;
+  --borda-forte: #cfd4dc;
+  --texto: #14181f;
+  --texto-fraco: #626b7d;
+  --texto-tenue: #8a93a3;
+  --acento: #0f766e;
+  --acento-forte: #0b5a54;
+  --acento-suave: #ecfdf5;
+  --acento-texto: #047857;
+  --aviso-bg: #fff8e6;
+  --aviso-borda: #f0d9a0;
+  --aviso-texto: #7a5a0c;
+  --alerta-bg: #fdf1f1;
+  --alerta-borda: #f3c2c2;
+  --alerta-texto: #9b2626;
+  --sombra: 0 1px 2px rgba(16, 24, 40, .05), 0 2px 6px rgba(16, 24, 40, .06);
+  --sombra-forte: 0 4px 14px rgba(16, 24, 40, .1);
+  --raio: 14px;
+  --mapa-filtro: none;
+}
+
+:root[data-tema="escuro"] {
+  --bg: #0e1116;
+  --superficie: #161a21;
+  --superficie-2: #1d222b;
+  --borda: #262c36;
+  --borda-forte: #39414e;
+  --texto: #e8ecf2;
+  --texto-fraco: #99a2b2;
+  --texto-tenue: #6d7688;
+  --acento: #2dd4bf;
+  --acento-forte: #5eead4;
+  --acento-suave: #10312e;
+  --acento-texto: #5eead4;
+  --aviso-bg: #2e2510;
+  --aviso-borda: #5a4718;
+  --aviso-texto: #f0cf84;
+  --alerta-bg: #331718;
+  --alerta-borda: #5e2a2c;
+  --alerta-texto: #f5a3a3;
+  --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 2px 8px rgba(0, 0, 0, .3);
+  --sombra-forte: 0 6px 20px rgba(0, 0, 0, .5);
+  --mapa-filtro: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --bg: #0e1116;
+    --superficie: #161a21;
+    --superficie-2: #1d222b;
+    --borda: #262c36;
+    --borda-forte: #39414e;
+    --texto: #e8ecf2;
+    --texto-fraco: #99a2b2;
+    --texto-tenue: #6d7688;
+    --acento: #2dd4bf;
+    --acento-forte: #5eead4;
+    --acento-suave: #10312e;
+    --acento-texto: #5eead4;
+    --aviso-bg: #2e2510;
+    --aviso-borda: #5a4718;
+    --aviso-texto: #f0cf84;
+    --alerta-bg: #331718;
+    --alerta-borda: #5e2a2c;
+    --alerta-texto: #f5a3a3;
+    --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 2px 8px rgba(0, 0, 0, .3);
+    --sombra-forte: 0 6px 20px rgba(0, 0, 0, .5);
+    --mapa-filtro: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9);
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* o atributo hidden precisa vencer os display: das regras de layout */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--texto);
+  font: 15px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--acento-texto); }
+
+button, select, input { font: inherit; }
+
+:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+/* Os tiles do OpenStreetMap sao claros; no tema escuro sao invertidos para nao
+   virarem a unica area branca da tela. */
+.leaflet-tile-pane { filter: var(--mapa-filtro); }
+.leaflet-container { background: var(--superficie-2); font: inherit; }
+.leaflet-control-attribution { font-size: 10px; }

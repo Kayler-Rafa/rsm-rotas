@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RSM &middot; análise técnica</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<header class="topo">
+  <div class="marca">
+    <span class="sigla">RSM</span>
+    <div>
+      <h1>Análise técnica</h1>
+      <p class="sub">Grafo, algoritmos e viabilidade &middot; <a href="/">voltar ao app</a></p>
+    </div>
+  </div>
+  <div class="grafo-chip" id="grafo-chip">carregando…</div>
+</header>
+
+<main>
+  <!-- ----------------------------------------------------------- controles -->
+  <aside class="painel">
+
+    <section class="bloco">
+      <h2>Trajeto</h2>
+      <label for="origem">De onde</label>
+      <select id="origem"></select>
+      <button id="inverter" class="inverter" type="button" title="Inverter origem e destino">
+        &#8645; inverter sentido
+      </button>
+      <label for="destino">Para onde</label>
+      <select id="destino"></select>
+    </section>
+
+    <section class="bloco">
+      <h2>Como você quer ir</h2>
+      <p class="hint" style="margin-bottom:10px">
+        Marque o que você tem disponível. Caminhar é sempre o acesso e a saída.
+      </p>
+      <div class="chips" id="chips-modos"></div>
+      <div class="atalhos">
+        <button type="button" data-preset="todos">tudo</button>
+        <button type="button" data-preset="publico">só público</button>
+        <button type="button" data-preset="ativo">só ativo</button>
+        <button type="button" data-preset="carro">só carro</button>
+      </div>
+    </section>
+
+    <section class="bloco">
+      <h2>Condições</h2>
+
+      <label for="clima">Clima</label>
+      <select id="clima"></select>
+      <p class="hint" id="clima-desc"></p>
+
+      <label for="transito">Trânsito</label>
+      <select id="transito"></select>
+      <p class="hint" id="transito-desc"></p>
+
+      <label for="seguranca">Segurança da rota</label>
+      <select id="seguranca"></select>
+      <p class="hint" id="seguranca-desc"></p>
+
+      <label class="switch">
+        <input type="checkbox" id="acessivel">
+        <span>Preciso de rota acessível</span>
+      </label>
+      <p class="hint">Remove trechos sem acessibilidade e os modais de duas rodas.</p>
+
+      <label class="switch" id="switch-recarga">
+        <input type="checkbox" id="recarga">
+        <span>Parar para recarregar no caminho</span>
+      </label>
+      <p class="hint" id="recarga-desc">Obriga a rota a passar por um eletroposto. Exige o carro elétrico próprio marcado.</p>
+    </section>
+
+    <section class="bloco">
+      <h2>O que importa mais</h2>
+      <div class="chips" id="chips-perfil"></div>
+      <p class="hint" id="perfil-pesos"></p>
+
+      <label for="normalizacao">Normalização do TOPSIS</label>
+      <select id="normalizacao">
+        <option value="minmax">min-max (pesos independentes da dispersão)</option>
+        <option value="vetorial">vetorial (clássica, usada na Etapa 2)</option>
+      </select>
+
+      <button id="calcular" class="primario" type="button">Calcular rota</button>
+    </section>
+
+    <section class="bloco" id="resumo-bloco" hidden>
+      <h2>Rota recomendada</h2>
+      <div class="metricas" id="metricas"></div>
+      <p class="aviso">
+        Todos os números são <strong>estimativa</strong>. A coleta de dados não
+        identificou feed GTFS aberto nem API de tempo real para os ônibus da RMR:
+        os tempos de espera são penalidades fixas de transferência, não a espera efetiva.
+      </p>
+      <h3>Composição da viagem</h3>
+      <ol class="passos" id="passos"></ol>
+    </section>
+  </aside>
+
+  <!-- --------------------------------------------------------------- mapa -->
+  <section class="conteudo">
+    <div id="mapa"></div>
+    <div class="legenda" id="legenda-mapa"></div>
+
+    <nav class="abas" role="tablist">
+      <button class="aba ativa" data-aba="pareto" type="button">Alternativas</button>
+      <button class="aba" data-aba="viabilidade" type="button">Viabilidade dos modais</button>
+      <button class="aba" data-aba="condicoes" type="button">Efeito das condições</button>
+      <button class="aba" data-aba="busca" type="button">Dijkstra &times; A*</button>
+      <button class="aba" data-aba="metro" type="button">Eixo metroferroviário</button>
+      <button class="aba" data-aba="nsga" type="button">Exato &times; NSGA-II</button>
+    </nav>
+
+    <div class="painel-aba" id="aba-pareto">
+      <p class="hint">
+        Fronteira de Pareto calculada uma única vez pelo algoritmo de Martins.
+        Cada perfil apenas <em>reordena</em> este mesmo conjunto por TOPSIS — nenhum
+        recálculo do grafo por usuário. Clique em uma linha para vê-la no mapa.
+      </p>
+      <div id="pareto-grafico"></div>
+      <div class="tabela-rolavel"><table id="tabela-pareto"></table></div>
+    </div>
+
+    <div class="painel-aba" id="aba-viabilidade" hidden>
+      <p class="hint">
+        Para cada modal, a melhor viagem possível usando <em>somente ele mais a
+        caminhada</em>, nas condições que você escolheu. Isolar o modal é o que
+        responde "isso dá conta deste trajeto?" &mdash; em vez de deixá-lo aparecer
+        como uma perna de 500 m dentro de uma rota mista.
+      </p>
+      <button id="rodar-viabilidade" class="secundario" type="button">Avaliar os modais</button>
+      <div id="viabilidade-conteudo"></div>
+    </div>
+
+    <div class="painel-aba" id="aba-condicoes" hidden>
+      <p class="hint">
+        Varia <em>uma</em> condição por vez a partir das suas opções atuais, para
+        isolar o efeito de cada uma sobre a rota ótima.
+      </p>
+      <button id="rodar-condicoes" class="secundario" type="button">Comparar condições</button>
+      <div id="condicoes-conteudo"></div>
+    </div>
+
+    <div class="painel-aba" id="aba-busca" hidden>
+      <div id="busca-cards"></div>
+      <p class="hint" id="busca-nota"></p>
+    </div>
+
+    <div class="painel-aba" id="aba-metro" hidden>
+      <div id="metro-conteudo"></div>
+    </div>
+
+    <div class="painel-aba" id="aba-nsga" hidden>
+      <p class="hint">
+        Compara a fronteira exata (Martins) com a aproximada (NSGA-II) sobre a mesma
+        instância. O NSGA-II leva alguns segundos.
+      </p>
+      <button id="rodar-nsga" class="secundario" type="button">Executar NSGA-II</button>
+      <div id="nsga-conteudo"></div>
+    </div>
+  </section>
+</main>
+
+<div id="carregando" class="carregando" hidden><div class="spinner"></div></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
