@@ -19,6 +19,8 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
+import seguranca
+
 # Centro geografico aproximado do corredor modelado (Recife / Olinda / Jaboatao).
 LAT, LON = -8.09, -34.89
 
@@ -152,6 +154,8 @@ def transito_atual(agora: Optional[datetime] = None) -> Dict[str, object]:
         "transito": nivel,
         "motivo": motivo,
         "hora_local": agora.strftime("%H:%M"),
+        # turno do risco viario (seguranca.py): noite das 18h as 6h
+        "turno": seguranca.turno_da_hora(agora.hour),
         "fonte": "estimativa por horario",
         "disponivel": True,
         "medido": False,

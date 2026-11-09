@@ -62,6 +62,7 @@ def _opcoes(params) -> Opcoes:
         acessivel=_bool(params, "acessivel"),
         recarga=_bool(params, "recarga"),
         evitar_inseguros=_bool(params, "evitar_inseguros", True),
+        turno=_valida(params, "turno", {"dia", "noite"}, "dia"),
     )
 
 

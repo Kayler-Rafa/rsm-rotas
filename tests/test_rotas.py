@@ -358,6 +358,56 @@ class TestTransportePublico(unittest.TestCase):
         self.assertLess(abs(ti - tv) / min(ti, tv), 0.10, "ida %.1f x volta %.1f" % (ti, tv))
 
 
+class TestRiscoNoturno(unittest.TestCase):
+    """Risco viario por turno: a noite so pode restringir mais, nunca liberar."""
+
+    ORDEM = {"ok": 0, "atencao": 1, "inseguro": 2}
+
+    def setUp(self):
+        import seguranca
+        self.seg = seguranca
+
+    def test_turno_da_hora(self):
+        self.assertEqual(self.seg.turno_da_hora(17), "dia")
+        self.assertEqual(self.seg.turno_da_hora(18), "noite")
+        self.assertEqual(self.seg.turno_da_hora(5), "noite")
+        self.assertEqual(self.seg.turno_da_hora(6), "dia")
+
+    def test_noite_nunca_libera_trecho(self):
+        from rede_rsm import TRECHOS
+        for t in TRECHOS:
+            for modo in ("pe", "bike"):
+                for a, b in ((t.u, t.v), (t.v, t.u)):
+                    dia = self.seg.nivel(a, b, modo, "dia")
+                    noite = self.seg.nivel(a, b, modo, "noite")
+                    if dia in self.ORDEM:
+                        self.assertGreaterEqual(self.ORDEM[noite], self.ORDEM[dia],
+                                                (a, b, modo, dia, noite))
+                    else:
+                        self.assertEqual(dia, noite)
+
+    def test_amostra_pequena_fica_na_media(self):
+        """Encolhimento: rua com 1 sinistro, noturno, nao vira 3x mais perigosa."""
+        a = {"pedestre": 1, "pedestre_noite": 1, "sinistros": 1, "sem_hora": 0}
+        self.assertLess(self.seg.fator_noite(a, "pedestre"), 1.25)
+        # e rua sem nenhum caso noturno nunca fica abaixo de 1 (dia = total)
+        b = {"pedestre": 30, "pedestre_noite": 0, "sinistros": 30, "sem_hora": 0}
+        self.assertEqual(self.seg.fator_noite(b, "pedestre"), 1.0)
+
+    def test_caso_real_domingos_ferreira_de_bicicleta(self):
+        self.assertEqual(self.seg.nivel("df_norte", "df_centro", "bike", "dia"), "ok")
+        self.assertEqual(self.seg.nivel("df_norte", "df_centro", "bike", "noite"), "atencao")
+
+    def test_ninguem_anda_ou_pedala_em_via_insegura_a_noite(self):
+        for o, d in PARES:
+            g = construir_grafo(Opcoes(turno="noite"), o, d)
+            for u, arestas in g.adj.items():
+                for ar in arestas:
+                    if ar.tipo == "deslocamento" and u[1] in ("pe", "bike", "ebike", "patinete"):
+                        self.assertFalse(self.seg.inseguro_para(u[0], ar.destino[0], u[1], "noite"),
+                                         (u, ar.destino))
+
+
 class TestContramao(unittest.TestCase):
     """Aviso de bicicleta na contramao: so onde a rota de fato pula um contorno."""
 

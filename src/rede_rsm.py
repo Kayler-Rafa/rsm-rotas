@@ -470,6 +470,9 @@ class Opcoes:
     # Nao mandar ninguem a pe ou de duas rodas por via entre as 10% mais
     # perigosas do Recife para aquele tipo de usuario (dado da CTTU, seguranca.py).
     evitar_inseguros: bool = True
+    # "dia" ou "noite" (seguranca.turno_da_hora). A noite, ruas que concentram
+    # sinistros noturnos ficam mais restritas; de dia vale o total do periodo.
+    turno: str = "dia"
 
     @property
     def recarga_efetiva(self) -> bool:
@@ -487,6 +490,7 @@ class Cenario:
     fator_tempo_motorizado: float = 1.0  # onibus, carro, carro de app
     seguranca_min: float = 0.0           # corta trechos abaixo deste indice
     evitar_inseguros: bool = True        # corta trecho inseguro para modo exposto
+    turno: str = "dia"                   # risco viario do turno (seguranca.py)
 
 
 def cenario_de(op: Opcoes) -> Cenario:
@@ -510,6 +514,7 @@ def cenario_de(op: Opcoes) -> Cenario:
         fator_tempo_motorizado=motorizado,
         seguranca_min=float(seg["minimo"]),
         evitar_inseguros=op.evitar_inseguros,
+        turno=op.turno if op.turno in ("dia", "noite") else "dia",
     )
 
 
@@ -805,7 +810,7 @@ def construir_grafo(opcoes: Optional[Opcoes] = None,
             # e o usuario exposto que esses sinistros medem.
             if cen.evitar_inseguros and modo in MODOS_EXPOSTOS:
                 import seguranca
-                if seguranca.inseguro_para(t.u, t.v, modo):
+                if seguranca.inseguro_para(t.u, t.v, modo, cen.turno):
                     continue
             # o trecho so existe na camada se o modo tem oferta nos dois extremos
             if not (oferta_no_ponto(pu, modo) and oferta_no_ponto(pv, modo)):

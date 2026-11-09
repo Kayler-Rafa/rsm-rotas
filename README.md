@@ -169,6 +169,11 @@ por quê.
 criminalidade por rua na RMR: o conjunto de ocorrências da Guarda Municipal está
 publicado sem nenhum arquivo.
 
+**À noite (18h–6h)** o app fica mais restrito nas ruas que concentram
+sinistros noturnos. A amostra noturna é pequena (153 atropelamentos em 3 anos
+no Recife), então a fração noturna de cada rua é puxada para a média da
+cidade antes de pesar, e o turno só pode restringir mais, nunca liberar.
+
 Para refazer os dados: `python src/seguranca.py`.
 
 ## Atualização automática
@@ -205,7 +210,7 @@ rotas/
 │   ├── motor.py       consulta, rota, cards do app e análise de viabilidade
 │   └── server.py      servidor HTTP (biblioteca padrão)
 ├── tests/
-│   └── test_rotas.py  22 testes de corretude das rotas, dos algoritmos e da segurança
+│   └── test_rotas.py  27 testes de corretude das rotas, dos algoritmos e da segurança
 ├── dados/
 │   ├── matriz_carro.json   distância e tempo de carro entre os 30 pontos (OSRM)
 │   ├── geometria.json      traçados reais (OSRM)

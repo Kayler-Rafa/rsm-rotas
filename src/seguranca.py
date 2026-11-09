@@ -120,6 +120,23 @@ def _registros(recurso: str) -> List[Dict[str, object]]:
             return saida
 
 
+# Turno noturno: das 18:00 as 05:59. O Recife escurece por volta das 17:30 o
+# ano todo (latitude 8 S); 18h e o corte usual de "noite" em estatistica de
+# transito e casa com o fim do pico da tarde do clima.py.
+NOITE_INICIO, NOITE_FIM = 18, 6
+
+
+def turno_da_hora(hora: int) -> str:
+    return "noite" if hora >= NOITE_INICIO or hora < NOITE_FIM else "dia"
+
+
+def _turno_registro(r: Dict[str, object]) -> Optional[str]:
+    m = re.match(r"\s*(\d{1,2}):", str(r.get("hora") or ""))
+    if not m or int(m.group(1)) > 23:
+        return None
+    return turno_da_hora(int(m.group(1)))
+
+
 def _agregar():
     por_via: Dict[str, Dict[str, float]] = {}
     por_nucleo: Dict[str, Dict[str, float]] = {}
@@ -130,20 +147,55 @@ def _agregar():
             via = normalizar(str(r.get("endereco") or ""))
             if not via:
                 continue
+            noite = _turno_registro(r) == "noite"
             for tabela, chave in ((por_via, via), (por_nucleo, nucleo(via))):
                 a = tabela.setdefault(chave, {"sinistros": 0, "com_vitima": 0,
-                                              "pedestre": 0, "ciclista": 0, "fatais": 0})
+                                              "pedestre": 0, "ciclista": 0, "fatais": 0,
+                                              "sinistros_noite": 0, "pedestre_noite": 0,
+                                              "ciclista_noite": 0, "sem_hora": 0})
                 a["sinistros"] += 1
+                if _turno_registro(r) is None:
+                    a["sem_hora"] += 1
+                if noite:
+                    a["sinistros_noite"] += 1
                 if _num(r.get("vitimas")) > 0:
                     a["com_vitima"] += 1
                 if _num(r.get("pedestre")) > 0:
                     a["pedestre"] += 1
+                    if noite:
+                        a["pedestre_noite"] += 1
                 if _num(r.get("ciclista")) > 0:
                     a["ciclista"] += 1
+                    if noite:
+                        a["ciclista_noite"] += 1
                 if _num(r.get("vitimasfatais")) > 0:
                     a["fatais"] += 1
         time.sleep(0.5)
     return por_via, por_nucleo
+
+
+def atualizar_turnos() -> None:
+    """Rebaixa so a CTTU e grava as contagens noturnas no JSON existente,
+    sem refazer o comprimento das ruas (Overpass) nem as ruas dos trechos."""
+    d = dict(carregar())
+    if not d.get("por_via"):
+        raise RuntimeError("rode primeiro: python src/seguranca.py")
+    por_via, por_nucleo = _agregar()
+    for tabela_nova, chave in ((por_via, "por_via"), (por_nucleo, "por_nucleo")):
+        antiga = d[chave]                                  # type: ignore[index]
+        for via, a in tabela_nova.items():
+            if via in antiga:
+                for campo in ("sinistros_noite", "pedestre_noite", "ciclista_noite",
+                              "sem_hora"):
+                    antiga[via][campo] = a[campo]
+    totais = {t: sum(int(a.get(t, 0)) for a in d["por_via"].values())   # type: ignore[union-attr]
+              for t in ("pedestre", "pedestre_noite", "ciclista", "ciclista_noite",
+                        "sinistros", "sinistros_noite", "sem_hora")}
+    d["turnos"] = {"noite": "%02d:00-%02d:00" % (NOITE_INICIO, NOITE_FIM),
+                   "totais": totais}
+    with open(ARQUIVO, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False)
+    print("turnos gravados: %s" % totais)
 
 
 def _comprimentos_osm():
@@ -427,8 +479,46 @@ def _densidade(a: Dict[str, object], tipo: str, anos: int) -> float:
     return float(a[tipo]) / max(float(a["km"]), KM_MINIMO_DENSIDADE) / anos  # type: ignore[arg-type]
 
 
-def _densidade_para_veredito(a: Dict[str, object], tipo: str, anos: int) -> float:
+# Risco noturno. Por rua, a noite, sao de 0 a 10 casos em 3 anos (153
+# atropelamentos e 81 sinistros com ciclista a noite no Recife inteiro, e 22%
+# dos registros sem hora): um limiar P90 so da noite seria ruido. Em vez disso:
+#   - a fracao noturna da rua e encolhida para a da cidade com peso de
+#     PESO_PRIOR_NOITE sinistros (empirical Bayes): rua com pouca amostra fica
+#     na media; so rua com muitos casos noturnos se destaca;
+#   - fator = fracao encolhida da rua / fracao da cidade;
+#   - a noite a densidade e multiplicada por max(1, fator). De dia vale o total.
+#     O turno so AUMENTA a restricao: nunca libera rua perigosa com base em
+#     amostra pequena.
+PESO_PRIOR_NOITE = 10.0
+
+
+def _fracao_noite_cidade(tipo: str) -> Optional[float]:
+    t = (carregar().get("turnos") or {}).get("totais") or {}   # type: ignore[union-attr]
+    if not t or not t.get(tipo) or not t.get("sinistros"):
+        return None
+    com_hora = float(t[tipo]) * (1.0 - float(t["sem_hora"]) / float(t["sinistros"]))
+    return float(t["%s_noite" % tipo]) / com_hora if com_hora > 0 else None
+
+
+def fator_noite(a: Dict[str, object], tipo: str) -> float:
+    """Quanto a rua concentra os sinistros daquele usuario a noite, relativo a
+    cidade, com encolhimento; >= 1."""
+    p = _fracao_noite_cidade(tipo)
+    if not p or "%s_noite" % tipo not in a:
+        return 1.0
+    n = float(a[tipo])                                         # type: ignore[arg-type]
+    sinistros = float(a.get("sinistros") or 0) or 1.0          # type: ignore[arg-type]
+    n_hora = n * (1.0 - float(a.get("sem_hora") or 0) / sinistros)   # type: ignore[arg-type]
+    noite = float(a["%s_noite" % tipo])                        # type: ignore[arg-type]
+    fracao = (noite + PESO_PRIOR_NOITE * p) / (n_hora + PESO_PRIOR_NOITE)
+    return max(1.0, fracao / p)
+
+
+def _densidade_para_veredito(a: Dict[str, object], tipo: str, anos: int,
+                             turno: str = "dia") -> float:
     dens = _densidade(a, tipo, anos)
+    if turno == "noite":
+        dens *= fator_noite(a, tipo)
     lim = limiar(tipo)
     if lim and float(a[tipo]) < MIN_SINISTROS_PARA_BLOQUEAR:   # type: ignore[arg-type]
         return min(dens, lim * 0.999)
@@ -453,14 +543,15 @@ def _vias_do_trecho(u: str, v: str, modo: Optional[str] = None) -> List[List[obj
     return trechos.get("%s|%s" % (u, v)) or trechos.get("%s|%s" % (v, u)) or []
 
 
-def risco_trecho(u: str, v: str, modo: Optional[str] = None) -> Dict[str, object]:
+def risco_trecho(u: str, v: str, modo: Optional[str] = None,
+                 turno: str = "dia") -> Dict[str, object]:
     """Risco de um trecho do modelo para quem anda e para quem pedala.
 
     Densidade = media, ponderada pelos km, da densidade de sinistros (por km e
     por ano) de cada rua por onde o trecho passa - no caminho daquele modo.
     Inseguro = densidade no nivel das 10% arteriais mais perigosas do Recife.
     """
-    chave = "%s|%s|%s" % (u, v, modo)
+    chave = "%s|%s|%s|%s" % (u, v, modo, turno)
     if chave in _risco_cache:
         return _risco_cache[chave]
     d = carregar()
@@ -469,7 +560,8 @@ def risco_trecho(u: str, v: str, modo: Optional[str] = None) -> Dict[str, object
     por_nucleo = d.get("por_nucleo") or {}                    # type: ignore[union-attr]
     total = sum(float(item[1]) for item in vias) or 0.0
 
-    saida: Dict[str, object] = {"vias": [], "cobertura": 0.0, "tem_dado": False}
+    saida: Dict[str, object] = {"vias": [], "cobertura": 0.0, "tem_dado": False,
+                                "turno": turno}
     com_dado = 0.0
     soma = {"pedestre": 0.0, "ciclista": 0.0}
     anos = len(d.get("anos") or []) or 3                      # type: ignore[arg-type]
@@ -482,7 +574,7 @@ def risco_trecho(u: str, v: str, modo: Optional[str] = None) -> Dict[str, object
         if not a or not a.get("km"):
             continue                                  # rua fora do Recife ou sem nome casavel
         dens = {t: _densidade(a, t, anos) for t in soma}
-        veredito = {t: _densidade_para_veredito(a, t, anos) for t in soma}
+        veredito = {t: _densidade_para_veredito(a, t, anos, turno) for t in soma}
         com_dado += float(km)
         for t in soma:
             soma[t] += float(km) * veredito[t]
@@ -491,6 +583,10 @@ def risco_trecho(u: str, v: str, modo: Optional[str] = None) -> Dict[str, object
             "pedestre": a["pedestre"], "ciclista": a["ciclista"],
             "fatais": a["fatais"], "pedestre_km_ano": round(dens["pedestre"], 3),
             "ciclista_km_ano": round(dens["ciclista"], 3),
+            "pedestre_noite": a.get("pedestre_noite"),
+            "ciclista_noite": a.get("ciclista_noite"),
+            "fator_noite_pedestre": round(fator_noite(a, "pedestre"), 2),
+            "fator_noite_ciclista": round(fator_noite(a, "ciclista"), 2),
             # quanto esta rua pesa no veredito do trecho (km x densidade usada)
             "peso_pedestre": round(float(km) * veredito["pedestre"], 4),
             "peso_ciclista": round(float(km) * veredito["ciclista"], 4),
@@ -509,19 +605,19 @@ def risco_trecho(u: str, v: str, modo: Optional[str] = None) -> Dict[str, object
     return saida
 
 
-def inseguro_para(u: str, v: str, modo: str) -> bool:
+def inseguro_para(u: str, v: str, modo: str, turno: str = "dia") -> bool:
     usuario = USUARIO_DO_MODO.get(modo)
     if not usuario:
         return False
-    return bool(risco_trecho(u, v, modo).get("inseguro_%s" % usuario))
+    return bool(risco_trecho(u, v, modo, turno).get("inseguro_%s" % usuario))
 
 
-def nivel(u: str, v: str, modo: str) -> str:
+def nivel(u: str, v: str, modo: str, turno: str = "dia") -> str:
     """'inseguro', 'atencao', 'ok' ou 'sem_dado' para um modo exposto num trecho."""
     usuario = USUARIO_DO_MODO.get(modo)
     if not usuario:
         return "nao_se_aplica"
-    r = risco_trecho(u, v, modo)
+    r = risco_trecho(u, v, modo, turno)
     if not r.get("tem_dado"):
         return "sem_dado"
     if r.get("inseguro_%s" % usuario):
@@ -539,6 +635,9 @@ def fonte() -> Dict[str, object]:
 
 
 if __name__ == "__main__":
+    if "--turnos" in sys.argv:
+        atualizar_turnos()
+        sys.exit(0)
     construir()
     if "--vias" in sys.argv:
         d = carregar()

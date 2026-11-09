@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import algoritmos as alg
@@ -688,7 +689,7 @@ def _avisos(rota: Dict[str, object], cond: Dict[str, object]) -> List[Dict[str, 
 USUARIO_ROTULO = {"pedestre": ("a pé", "quem anda"), "ciclista": ("de bicicleta", "quem pedala")}
 
 
-def _seguranca_da_rota(rota: Dict[str, object]) -> Dict[str, object]:
+def _seguranca_da_rota(rota: Dict[str, object], turno: str = "dia") -> Dict[str, object]:
     """Nivel de seguranca viaria de cada trecho a pe ou de duas rodas da rota."""
     trechos: List[Dict[str, object]] = []
     for seg in rota["segmentos"]:                         # type: ignore[union-attr]
@@ -699,8 +700,8 @@ def _seguranca_da_rota(rota: Dict[str, object]) -> Dict[str, object]:
         if not usuario:
             continue
         for a, b in zip(seg["pontos"], seg["pontos"][1:]):
-            nivel = seguranca.nivel(a, b, modo)
-            risco = seguranca.risco_trecho(a, b, modo)
+            nivel = seguranca.nivel(a, b, modo, turno)
+            risco = seguranca.risco_trecho(a, b, modo, turno)
             # a rua citada e a que mais pesa no veredito, nao a de maior
             # densidade: 50 m de uma rua perigosa nao explicam um trecho de 2 km.
             # Rua com poucos sinistros nao bloqueia sozinha, entao vem depois.
@@ -712,10 +713,13 @@ def _seguranca_da_rota(rota: Dict[str, object]) -> Dict[str, object]:
                 "densidade": risco.get("%s_km_ano" % usuario),
                 "via": vias[0]["nome"] if vias else None,
                 "sinistros_usuario": vias[0][usuario] if vias else None,
+                "sinistros_noite": vias[0].get("%s_noite" % usuario) if vias else None,
+                "fator_noite": vias[0].get("fator_noite_%s" % usuario) if vias else None,
                 "fatais": vias[0]["fatais"] if vias else None,
                 "cobertura": risco.get("cobertura"),
             })
     return {
+        "turno": turno,
         "trechos": trechos,
         "inseguros": [t for t in trechos if t["nivel"] == "inseguro"],
         "atencao": [t for t in trechos if t["nivel"] == "atencao"],
@@ -773,7 +777,8 @@ def _card(perfil_id: str, rota: Dict[str, object],
         "usa_carro": "carro" in rota["modos"],          # type: ignore[operator]
         "avisos": _avisos(rota, cond),
         "segmentos": rota["segmentos"],
-        "seguranca": _seguranca_da_rota(rota),
+        "seguranca": _seguranca_da_rota(
+            rota, str((cond.get("transito") or {}).get("turno", "dia"))),   # type: ignore[union-attr]
     }
 
 
@@ -974,7 +979,8 @@ def _variante_recarga(origem_id: str, destino_id: str, op: Opcoes,
                       cond: Dict[str, object]) -> Optional[Dict[str, object]]:
     """A mesma viagem de carro proprio, com a parada de recarga que menos atrasa."""
     op_rec = Opcoes(modos=frozenset({"pe", "carro"}), clima=op.clima,
-                    transito=op.transito, acessivel=op.acessivel, recarga=True)
+                    transito=op.transito, acessivel=op.acessivel, recarga=True,
+                    turno=op.turno)
     g = construir_grafo(op_rec, origem_id, destino_id)
     origem: No = (origem_id, "pe", 0, 0)
     destinos = nos_destino(g, destino_id, True)
@@ -1007,7 +1013,7 @@ def _transporte_publico(origem_id: str, destino_id: str, op: Opcoes,
     """
     op_tp = Opcoes(modos=MODOS_TRANSPORTE_PUBLICO, clima=op.clima,
                    transito=op.transito, acessivel=op.acessivel,
-                   evitar_inseguros=op.evitar_inseguros)
+                   evitar_inseguros=op.evitar_inseguros, turno=op.turno)
     g = construir_grafo(op_tp, origem_id, destino_id)
     origem: No = (origem_id, "pe", 0, 0)
     destinos = nos_destino(g, destino_id)
@@ -1040,6 +1046,7 @@ def opcoes_de_viagem(origem_id: str, destino_id: str,
         transito=str(cond["transito"]["transito"]),    # type: ignore[index]
         acessivel=acessivel,
         evitar_inseguros=evitar_inseguros,
+        turno=str(cond["transito"].get("turno", "dia")),   # type: ignore[union-attr]
     )
 
     g = construir_grafo(op, origem_id, destino_id)
@@ -1057,7 +1064,8 @@ def opcoes_de_viagem(origem_id: str, destino_id: str,
     evitados: List[Dict[str, object]] = []
     if evitar_inseguros:
         op_bruto = Opcoes(modos=op.modos, clima=op.clima, transito=op.transito,
-                          acessivel=op.acessivel, evitar_inseguros=False)
+                          acessivel=op.acessivel, evitar_inseguros=False,
+                          turno=op.turno)
         g_bruto = construir_grafo(op_bruto, origem_id, destino_id)
         destinos_bruto = nos_destino(g_bruto, destino_id)
         if origem in g_bruto.adj and destinos_bruto:
@@ -1144,5 +1152,6 @@ def opcoes_de_viagem(origem_id: str, destino_id: str,
         "grafo": propriedades(g),
         "evitados": evitados,
         "seguranca_fonte": seguranca.fonte(),
-        "gerado_em": time.strftime("%H:%M:%S"),
+        "gerado_em": datetime.now(clima_mod.FUSO_RECIFE).strftime("%H:%M:%S"),
+        "turno": op.turno,
     }

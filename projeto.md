@@ -9,10 +9,11 @@ deploy; ver §9b).
 
 ```bash
 python src/server.py                          # app em http://localhost:8000, técnico em /admin
-python -m unittest discover -s tests -v       # 22 testes de corretude (~2 min)
+python -m unittest discover -s tests -v       # 27 testes de corretude (~2 min)
 python src/geometria.py                       # rebaixa matriz e traçados do OSRM (rede mudou)
 python src/geometria.py --bike-legal          # só as distâncias legais de bike (aviso de contramão)
 python src/seguranca.py                       # rebaixa sinistros da CTTU e comprimentos do OSM
+python src/seguranca.py --turnos              # só as contagens noturnas (sem Overpass)
 python src/rede_rsm.py                        # |V|, |E| e custo por modal
 ```
 
@@ -311,6 +312,33 @@ Na varredura, 23 dos 870 pares têm algo evitado, sempre a Dantas Barreto a pé.
 nenhum. `evitar_inseguros=0` na API desliga o filtro (para comparação no
 `/admin`).
 
+### Risco noturno (2026-11-09)
+
+Noite = **18h às 6h** (`seguranca.turno_da_hora`); o turno vem da hora do
+Recife em `clima.transito_atual()["turno"]` e segue por `Opcoes.turno` →
+`Cenario.turno` → `seguranca.inseguro_para/nivel/risco_trecho(..., turno)`.
+`/api/rota` etc. aceitam `turno=noite` para demonstrar de dia.
+
+**Por que não um limiar só da noite:** no Recife inteiro, em 3 anos, são 153
+atropelamentos e 81 sinistros com ciclista à noite, e 22% dos registros não
+têm hora. Por rua, de 0 a 10 casos. P90 noturno seria ruído. Então:
+
+- fração noturna da rua **encolhida** para a da cidade (31% pedestre, 25%
+  ciclista, entre registros com hora) com peso de 10 sinistros
+  (`PESO_PRIOR_NOITE`, *empirical Bayes*);
+- `fator_noite` = fração encolhida ÷ fração da cidade;
+- à noite, densidade × **max(1, fator)**; de dia vale o total. O turno **só
+  restringe mais**: nunca libera rua perigosa com amostra pequena. A regra dos
+  5 sinistros (`MIN_SINISTROS_PARA_BLOQUEAR`) é aplicada **depois** do fator.
+
+Efeito hoje: pedestre Agamenon ×1,32, Dantas Barreto ×1,29, Cruz Cabugá ×1,19
+(já inseguras). Muda de nível um trecho: **Domingos Ferreira norte → centro de
+bicicleta, ok → atenção** à noite (×1,12). O app mostra "Noite: risco
+noturno" na barra e "N deles à noite" no aviso do trecho.
+
+**Fuso:** `gerado_em` agora usa `clima.FUSO_RECIFE`. Antes usava a hora do
+servidor, e na Vercel (UTC) o "atualizado às" saía 3 h adiantado.
+
 ## 4c. Atualização automática
 
 O app reconsulta `/api/opcoes` **a cada 60 s**, e só com a aba visível. Ao voltar
@@ -388,7 +416,7 @@ Jequitinhonha, rápido, sobre a rota — o acréscimo é só a carga, sem desvio
 
 ## 7. Testes (`tests/test_rotas.py`)
 
-22 testes, stdlib `unittest`, ~2 min. Cada um verifica uma **propriedade** que tem
+27 testes, stdlib `unittest`, ~2 min. Cada um verifica uma **propriedade** que tem
 de valer, não um número copiado da saída:
 
 | Teste | Garante |
@@ -415,6 +443,11 @@ de valer, não um número copiado da saída:
 | `test_onibus_leva_o_mesmo_tempo_nos_dois_sentidos` | Sé ⇄ Piedade de ônibus com < 10% de diferença |
 | `test_contramao_so_onde_a_rota_legal_e_bem_maior` | marca só com economia ≥ 25% e ≥ 300 m, nunca em traçado de avenida (carro), e < 10 trechos |
 | `test_caso_real_sao_jose_ponte_paulo_guerra` | bike Sé → Piedade avisa São José → Ponte PG; cards sem duas rodas não |
+| `test_turno_da_hora` | 18h–6h é noite |
+| `test_noite_nunca_libera_trecho` | nível noturno ≥ diurno em todo trecho, a pé e de bike |
+| `test_amostra_pequena_fica_na_media` | 1 caso noturno não vira ×3; fator nunca < 1 |
+| `test_caso_real_domingos_ferreira_de_bicicleta` | df_norte → df_centro de bike: ok de dia, atenção à noite |
+| `test_ninguem_anda_ou_pedala_em_via_insegura_a_noite` | grafo noturno não tem aresta exposta em trecho inseguro à noite |
 
 Varredura completa feita uma vez (não está na suíte por tempo): **870 pares ×
 3 trânsitos, A\* = Dijkstra em todos; Martins contém o ótimo em 60 pares × 4
@@ -502,9 +535,8 @@ Capacitor), não reescreva.
   Caminhos possíveis: a API do Fogo Cruzado (tiroteios geolocalizados no Grande
   Recife; exige cadastro, então o usuário cria a conta e fornece a chave) ou um
   pedido de acesso à SDS-PE. Nenhum dos dois foi feito.
-- **Risco por turno:** a CTTU registra a hora de cada sinistro. Daria para ter
-  risco noturno, e a atualização por minuto mudaria a rota ao anoitecer. Não foi
-  feito porque, separando por rua e por turno, a amostra fica pequena.
+- ~~Risco por turno~~ — feito com encolhimento (§4b, "Risco noturno"). Com
+  amostra pequena, o efeito é modesto, e é isso que o dado sustenta.
 - **Olinda e Jaboatão não têm dado de segurança**, porque a CTTU só cobre o
   Recife.
 

@@ -103,6 +103,9 @@ function renderCondicoes(){
   $("condicoes").innerHTML = c +
     `<span class="c" title="${esc(transito.fonte)} · ${esc(transito.motivo)} · ${esc(transito.hora_local)}">
        <i class="pt pt-e"></i>${cap(TXT_TRAN[transito.transito])} <b>estimado</b></span>` +
+    (transito.turno === "noite"
+      ? `<span class="c" title="Das 18h às 6h, ruas que concentram sinistros noturnos (CTTU) ficam mais restritas para quem anda ou pedala"><i class="pt pt-m"></i>Noite: <b>risco noturno</b></span>`
+      : "") +
     `<span class="c atualizado" title="As opções são recalculadas a cada minuto">atualizado às ${esc((estado.dados.gerado_em || "").slice(0, 5))}</span>`;
 }
 
@@ -208,7 +211,9 @@ function segurancaDoPasso(v, s){
   const atencao = meus.filter(t => t.nivel === "atencao");
   if (atencao.length) {
     const t = atencao[0];
-    return `<span class="pt-seg atencao">Atenção: ${esc(t.via || "via")} tem ${t.sinistros_usuario} sinistros com ${quem} em 3 anos</span>`;
+    const noite = v.seguranca.turno === "noite" && t.fator_noite > 1.05
+      ? `, ${t.sinistros_noite} deles à noite` : "";
+    return `<span class="pt-seg atencao">Atenção: ${esc(t.via || "via")} tem ${t.sinistros_usuario} sinistros com ${quem} em 3 anos${noite}</span>`;
   }
   const semDado = meus.filter(t => t.nivel === "sem_dado").length;
   if (semDado === meus.length) return `<span class="pt-seg">Sem dado de segurança viária neste trecho</span>`;
