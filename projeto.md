@@ -9,8 +9,9 @@ deploy; ver §9b).
 
 ```bash
 python src/server.py                          # app em http://localhost:8000, técnico em /admin
-python -m unittest discover -s tests -v       # 20 testes de corretude (~2 min)
+python -m unittest discover -s tests -v       # 22 testes de corretude (~2 min)
 python src/geometria.py                       # rebaixa matriz e traçados do OSRM (rede mudou)
+python src/geometria.py --bike-legal          # só as distâncias legais de bike (aviso de contramão)
 python src/seguranca.py                       # rebaixa sinistros da CTTU e comprimentos do OSM
 python src/rede_rsm.py                        # |V|, |E| e custo por modal
 ```
@@ -169,6 +170,21 @@ distância e as ruas percorridas (`vias`).
   ≤ 1,6× a reta, senão 1,3× a reta.
 
 Para refazer: `python src/geometria.py --so-ativos [--forcar]`.
+
+**Aviso de contramão** (`geometria.contramao_bike`, 2026-11-09). Pedalar na
+contramão é infração (CTB art. 58) salvo sinalização; desmontado, empurrando,
+o ciclista equipara-se ao pedestre (art. 68 §1). O app mantém a rota curta e
+avisa no passo a passo e no card. Critério, por sentido de viagem:
+traçado vindo do **carro** (só usado em `trunk`, pista dupla) nunca é
+contramão; traçado do perfil **bike no próprio sentido** é legal; traçado
+**a pé** ou da **bike no sentido oposto** é contramão provável se economiza
+≥ 25% e ≥ 300 m sobre a rota legal de bike naquele sentido (`bike_km_ida`/
+`bike_km_volta` em cada item `|cycling` do cache, medidos por
+`python src/geometria.py --bike-legal`). Não compare com o carro no mesmo
+sentido: os pontos ficam na pista sentido sul e o carro de volta paga
+retornos, o que marcava a Agamenon (mão dupla) como contramão. Hoje marca um
+trecho só: **São José ⇄ Ponte Paulo Guerra** (1,45 km contra 2,85 km).
+Pina → Ponte PG (0,26 km) é legal: o perfil de bike também faz 0,26.
 `test_bike_e_pedestre_nao_contornam_mao_unica` garante que nenhum trecho de bike
 fica mais longo que o carro no melhor sentido.
 
@@ -372,7 +388,7 @@ Jequitinhonha, rápido, sobre a rota — o acréscimo é só a carga, sem desvio
 
 ## 7. Testes (`tests/test_rotas.py`)
 
-20 testes, stdlib `unittest`, ~2 min. Cada um verifica uma **propriedade** que tem
+22 testes, stdlib `unittest`, ~2 min. Cada um verifica uma **propriedade** que tem
 de valer, não um número copiado da saída:
 
 | Teste | Garante |
@@ -397,6 +413,8 @@ de valer, não um número copiado da saída:
 | `test_sem_dado_nao_e_seguro` | trecho em Olinda = "sem dado", nunca "ok" |
 | `test_card_transporte_publico_so_usa_coletivo_e_e_o_mais_rapido` | card existe nos 6 pares, só pe/ônibus/metrô, e é a mais rápida dessas |
 | `test_onibus_leva_o_mesmo_tempo_nos_dois_sentidos` | Sé ⇄ Piedade de ônibus com < 10% de diferença |
+| `test_contramao_so_onde_a_rota_legal_e_bem_maior` | marca só com economia ≥ 25% e ≥ 300 m, nunca em traçado de avenida (carro), e < 10 trechos |
+| `test_caso_real_sao_jose_ponte_paulo_guerra` | bike Sé → Piedade avisa São José → Ponte PG; cards sem duas rodas não |
 
 Varredura completa feita uma vez (não está na suíte por tempo): **870 pares ×
 3 trânsitos, A\* = Dijkstra em todos; Martins contém o ótimo em 60 pares × 4
@@ -507,10 +525,7 @@ Capacitor), não reescreva.
   foi usada no lugar, o traçado pode incluir um trecho de mão única que o
   pedestre faria pelo outro lado da avenida. Um OSRM próprio com perfil ajustado
   para o Brasil (`trunk` com calçada) resolveria.
-- **A contramão de bicicleta é infração** (CTB art. 58), salvo onde houver
-  sinalização. O app segue o comportamento real, que foi o pedido do usuário, mas
-  não avisa trecho a trecho. Um próximo passo seria marcar no passo a passo onde
-  a rota escolhida vai contra o fluxo.
+- ~~Contramão de bicicleta não avisada~~ — resolvido (§3, "Aviso de contramão").
 
 ---
 

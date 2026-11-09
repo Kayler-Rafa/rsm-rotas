@@ -399,8 +399,86 @@ def construir_ativos(forcar: bool = False) -> None:
     _cache.update(dados)
 
 
+# ------------------------------------------------- contramao de bicicleta
+# A rota de bike escolhida em construir_ativos ignora mao unica de proposito
+# (pedido do usuario: quem pedala no Recife nao contorna quarteirao). Mas
+# pedalar na contramao e infracao (CTB art. 58), salvo sinalizacao; desmontado,
+# empurrando, o ciclista equipara-se ao pedestre (art. 68 §1). Entao o app avisa
+# ONDE isso provavelmente acontece.
+#
+# Criterio, por sentido de viagem a -> b:
+#   - tracado vindo do CARRO: so e usado em highway=trunk (Agamenon, Av. Sul...),
+#     avenidas de pista dupla. O ciclista vai pela pista do seu sentido: nunca
+#     e contramao. (Comparar com o carro no mesmo sentido daria falso positivo:
+#     os pontos de rua ficam na pista sentido sul e o carro de volta paga retornos.)
+#   - tracado do perfil BIKE no proprio sentido: legal.
+#   - tracado A PE ou da BIKE no sentido oposto: compara com a rota LEGAL de
+#     bike naquele sentido (FOSSGIS, medida por medir_bike_legal). Provavel
+#     contramao se o escolhido economiza >= 25% e >= 300 m.
+FRACAO_CONTRAMAO = 0.75
+ECONOMIA_MIN_KM_CONTRAMAO = 0.3
+
+
+def contramao_bike(a: str, b: str) -> Optional[Dict[str, float]]:
+    """{'km': rota usada, 'km_legal': rota respeitando a mao} se o trecho a->b
+    de bicicleta provavelmente vai na contramao; senao None."""
+    dados = carregar()
+    item = dados.get(_chave(a, b, "cycling"))
+    mesmo_sentido = True
+    if not item:
+        item = dados.get(_chave(b, a, "cycling"))
+        mesmo_sentido = False
+    if not item:
+        return None
+    fonte = str(item.get("fonte") or "")
+    if fonte.startswith("OSRM carro"):
+        return None
+    if fonte == "FOSSGIS routed-bike" and mesmo_sentido:
+        return None
+    if fonte == "FOSSGIS routed-bike, sentido oposto" and not mesmo_sentido:
+        return None
+    legal = item.get("bike_km_ida" if mesmo_sentido else "bike_km_volta")
+    if legal is None:
+        return None
+    km, legal = float(item["dist_km"]), float(legal)     # type: ignore[arg-type]
+    if km <= FRACAO_CONTRAMAO * legal and legal - km >= ECONOMIA_MIN_KM_CONTRAMAO:
+        return {"km": round(km, 2), "km_legal": round(legal, 2)}
+    return None
+
+
+def medir_bike_legal() -> None:
+    """Grava em cada item 'u|v|cycling' a distancia do perfil bike do FOSSGIS
+    nos dois sentidos (bike_km_ida = u->v, bike_km_volta = v->u)."""
+    from rede_rsm import PONTO_POR_ID
+    dados = dict(carregar())
+    chaves = [k for k in dados if k.endswith("|cycling")]
+    for i, k in enumerate(chaves, 1):
+        u, v, _ = k.split("|")
+        pu, pv = PONTO_POR_ID[u], PONTO_POR_ID[v]
+        a, b = (pu.lat, pu.lon), (pv.lat, pv.lon)
+        ida = _consultar_fossgis("bike", a, b)
+        time.sleep(0.4)
+        volta = _consultar_fossgis("bike", b, a)
+        time.sleep(0.4)
+        if ida:
+            dados[k]["bike_km_ida"] = ida["dist_km"]
+        if volta:
+            dados[k]["bike_km_volta"] = volta["dist_km"]
+        print("[%2d/%2d] %-16s %-16s usada %.2f  legal ida %s volta %s" % (
+            i, len(chaves), u, v, float(dados[k]["dist_km"]),   # type: ignore[arg-type]
+            ida and ida["dist_km"], volta and volta["dist_km"]), flush=True)
+    with open(ARQUIVO, "w", encoding="utf-8") as fh:
+        json.dump(dados, fh, ensure_ascii=False)
+    _cache.clear()
+    _cache.update(dados)
+
+
 if __name__ == "__main__":
+    if "--bike-legal" in sys.argv:
+        medir_bike_legal()
+        sys.exit(0)
     if "--so-ativos" not in sys.argv:
         construir_matriz()
         construir_cache(forcar="--forcar" in sys.argv)
     construir_ativos(forcar="--forcar" in sys.argv)
+    medir_bike_legal()

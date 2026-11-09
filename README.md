@@ -205,7 +205,7 @@ rotas/
 │   ├── motor.py       consulta, rota, cards do app e análise de viabilidade
 │   └── server.py      servidor HTTP (biblioteca padrão)
 ├── tests/
-│   └── test_rotas.py  20 testes de corretude das rotas, dos algoritmos e da segurança
+│   └── test_rotas.py  22 testes de corretude das rotas, dos algoritmos e da segurança
 ├── dados/
 │   ├── matriz_carro.json   distância e tempo de carro entre os 30 pontos (OSRM)
 │   ├── geometria.json      traçados reais (OSRM)

@@ -666,6 +666,18 @@ def _avisos(rota: Dict[str, object], cond: Dict[str, object]) -> List[Dict[str, 
                        "Sem horários em tempo real na RMR: a espera é uma "
                        "estimativa de 7 min, não a espera real."})
 
+    contra = [c for s in rota["segmentos"]              # type: ignore[union-attr]
+              for c in (s.get("contramao") or [])]
+    if contra:
+        c = contra[0]
+        avisos.append({"nivel": "aviso", "texto":
+                       "Entre %s e %s a rota ignora a mão única (%s km contra %s km "
+                       "respeitando). Pedalar na contramão é infração (CTB art. 58) "
+                       "onde não há sinalização: desça e empurre nesse trecho."
+                       % (c["de_nome"], c["para_nome"],
+                          ("%.2f" % c["km"]).replace(".", ","),
+                          ("%.2f" % c["km_legal"]).replace(".", ","))})
+
     if "ebike" in modos or "patinete" in modos:
         avisos.append({"nivel": "info", "texto":
                        "Cobrança por minuto; a disponibilidade da frota não é "
@@ -723,8 +735,27 @@ def _rotulo_perfil(perfil_id: str) -> str:
     return str(PERFIS[perfil_id]["rotulo"])
 
 
+MODOS_CONTRAMAO = frozenset({"bike", "ebike", "patinete"})
+
+
+def _marcar_contramao(rota: Dict[str, object]) -> None:
+    """Anota em cada perna de duas rodas os trechos de provavel contramao
+    (criterio em geometria.contramao_bike)."""
+    for seg in rota["segmentos"]:                       # type: ignore[union-attr]
+        if seg["tipo"] != "deslocamento" or seg["modo"] not in MODOS_CONTRAMAO:
+            continue
+        marcas = []
+        for a, b in zip(seg["pontos"], seg["pontos"][1:]):
+            c = geometria.contramao_bike(a, b)
+            if c:
+                marcas.append(dict(c, de=a, para=b, de_nome=PONTO_POR_ID[a].nome,
+                                   para_nome=PONTO_POR_ID[b].nome))
+        seg["contramao"] = marcas
+
+
 def _card(perfil_id: str, rota: Dict[str, object],
           cond: Dict[str, object]) -> Dict[str, object]:
+    _marcar_contramao(rota)
     return {
         "perfil": perfil_id,
         "rotulo": _rotulo_perfil(perfil_id),

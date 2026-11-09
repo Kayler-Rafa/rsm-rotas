@@ -358,5 +358,43 @@ class TestTransportePublico(unittest.TestCase):
         self.assertLess(abs(ti - tv) / min(ti, tv), 0.10, "ida %.1f x volta %.1f" % (ti, tv))
 
 
+class TestContramao(unittest.TestCase):
+    """Aviso de bicicleta na contramao: so onde a rota de fato pula um contorno."""
+
+    def test_contramao_so_onde_a_rota_legal_e_bem_maior(self):
+        from rede_rsm import MODOS_DUAS_RODAS, TRECHOS
+        dados = geometria.carregar()
+        marcados = 0
+        for t in TRECHOS:
+            if not set(t.modos) & MODOS_DUAS_RODAS:
+                continue
+            item = dados.get("%s|%s|cycling" % (t.u, t.v))
+            for a, b in ((t.u, t.v), (t.v, t.u)):
+                c = geometria.contramao_bike(a, b)
+                if not c:
+                    continue
+                marcados += 1
+                # traçado de avenida de pista dupla (vindo do carro) nunca é contramão
+                self.assertFalse(str(item["fonte"]).startswith("OSRM carro"), (a, b))
+                self.assertLessEqual(c["km"], geometria.FRACAO_CONTRAMAO * c["km_legal"] + 1e-9)
+                self.assertGreaterEqual(c["km_legal"] - c["km"],
+                                        geometria.ECONOMIA_MIN_KM_CONTRAMAO - 1e-9)
+        # se o critério marcar quase tudo, virou ruído e ninguém lê o aviso
+        self.assertLess(marcados, 10)
+
+    def test_caso_real_sao_jose_ponte_paulo_guerra(self):
+        r = motor.opcoes_de_viagem("se_olinda", "igreja_piedade")
+        bike = [c for c in r["cards"] if c["modos"] and "bike" in c["modos"]]
+        self.assertTrue(bike)
+        marcas = [(x["de"], x["para"]) for s in bike[0]["segmentos"]
+                  for x in (s.get("contramao") or [])]
+        self.assertIn(("sao_jose", "ponte_pg"), marcas)
+        self.assertTrue(any("mão única" in a["texto"] for a in bike[0]["avisos"]))
+        # e nenhum card sem duas rodas recebe a marca
+        for c in r["cards"]:
+            if not set(c["modos"]) & {"bike", "ebike", "patinete"}:
+                self.assertFalse(any(s.get("contramao") for s in c["segmentos"]))
+
+
 if __name__ == "__main__":
     unittest.main()

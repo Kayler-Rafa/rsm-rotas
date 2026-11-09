@@ -216,6 +216,13 @@ function segurancaDoPasso(v, s){
   return `<span class="pt-seg ok">Sem histórico alto de sinistros com ${quem}</span>`;
 }
 
+// Trecho de duas rodas que provavelmente vai na contramao (geometria.contramao_bike).
+function contramaoDoPasso(s){
+  const c = (s.contramao || [])[0];
+  if (!c) return "";
+  return `<span class="pt-seg atencao">Contramão provável: ${esc(c.de_nome)} → ${esc(c.para_nome)}. Desça e empurre</span>`;
+}
+
 function passosHTML(rota, v){
   const segs = v.segmentos;
   const itens = segs.map((s, idx) => {
@@ -225,7 +232,7 @@ function passosHTML(rota, v){
       return `<li class="passo">
         <span class="tr"><span class="ln${s.modo === "metro" ? " tracejado" : ""}" style="--m:${c}"></span></span>
         <span class="pt-txt"><span class="pt-t">${esc(cap(MODAIS[s.modo].rotulo))}</span>
-        <span class="pt-s">${km(s.dist_km)} · ${minutosTxt(s.tempo)}</span>${segurancaDoPasso(v, s)}</span></li>`;
+        <span class="pt-s">${km(s.dist_km)} · ${minutosTxt(s.tempo)}</span>${segurancaDoPasso(v, s)}${contramaoDoPasso(s)}</span></li>`;
     }
     if (s.tipo === "recarga") {
       return `<li class="passo">
