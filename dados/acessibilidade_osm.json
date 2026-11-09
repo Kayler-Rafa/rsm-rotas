@@ -141,7 +141,7 @@
    "piso_m": 0,
    "vias": [],
    "caminho": "a pe",
-   "km": 1.407,
+   "km": 1.369,
    "barreira_na_rota_a_pe": false
   },
   "boa_vista|recife_antigo": {
@@ -222,7 +222,7 @@
    "piso_m": 0,
    "vias": [],
    "caminho": "a pe",
-   "km": 0.741,
+   "km": 0.703,
    "barreira_na_rota_a_pe": false
   },
   "bv_norte|df_norte": {
@@ -335,7 +335,7 @@
    "piso_m": 0,
    "vias": [],
    "caminho": "pela via (ida)",
-   "km": 3.396,
+   "km": 3.438,
    "barreira_na_rota_a_pe": true
   }
  }

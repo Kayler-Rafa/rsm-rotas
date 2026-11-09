@@ -284,6 +284,12 @@ def construir_cache(forcar: bool = False) -> None:
             with open(ARQUIVO, "w", encoding="utf-8") as fh:
                 json.dump(dados, fh, ensure_ascii=False)
         time.sleep(0.5)
+    # Atualiza a memoria tambem: construir_ativos (chamado logo depois no
+    # __main__) parte de carregar(); sem isto ele regravava o arquivo com a
+    # copia velha e apagava os tracados de carro recem-baixados. Apareceu ao
+    # mover a Igreja da Piedade (2026-11-09).
+    _cache.clear()
+    _cache.update(dados)
     print("%d entradas no cache" % len(dados))
 
 

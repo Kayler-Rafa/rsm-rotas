@@ -206,7 +206,7 @@ class TestRotasBatemComAMalhaReal(unittest.TestCase):
         # O erro que originou tudo isto: pontos posicionados de memoria, a ate
         # 3,3 km do lugar real. Estacoes e igrejas foram conferidas no OSM.
         verificados = {
-            "se_olinda": (-8.01383, -34.84910), "igreja_piedade": (-8.16850, -34.91541),
+            "se_olinda": (-8.01383, -34.84910), "igreja_piedade": (-8.16925, -34.91424),   # OSM way 539764741, Av. Beira Mar
             "est_recife": (-8.06917, -34.88537), "tancredo_neves": (-8.12227, -34.91182),
             "aeroporto": (-8.13417, -34.91467), "imbiribeira": (-8.09020, -34.90751),
         }

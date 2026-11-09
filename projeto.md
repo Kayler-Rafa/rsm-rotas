@@ -53,6 +53,14 @@ Roma). PDFs de origem em `C:\Users\Rafael Diniz\Documents\grafos`.
 (Jaboatão). 18,7 km em linha reta, 22,4 km de carro pela via real. Origem e
 destino podem ser qualquer um dos 30 pontos.
 
+A igreja de destino é a da **beira-mar** (Av. Beira Mar, Piedade — OSM way
+539764741, -8.16925, -34.91424), não a Paróquia N. Sra. da Piedade da Av.
+Bernardo Vieira de Melo, 140 m a oeste, onde o ponto ficou até 2026-11-09
+(correção do usuário). O Nominatim põe "Av. Beira Mar, 114" 1,9 km ao norte,
+com outro CEP: erro de interpolação de número; vale o templo mapeado. Refeitos:
+matriz e traçados do OSRM, rotas a pé/bike e bike legal dos 3 trechos da igreja,
+ruas desses trechos em `seguranca_cttu.json` e `acessibilidade_osm.json`.
+
 **Restrição de stack (decisão do usuário):** backend Python **só com biblioteca
 padrão**; algoritmos implementados do zero. Frontend HTML/CSS/JS puro, Leaflet
 por CDN.
@@ -642,6 +650,11 @@ app em `src/cards.py`; `motor.opcoes_de_viagem` reexportado no fim de `motor.py`
    como par.
 2. **Mudou pontos? Rode `python src/geometria.py`.** A matriz é indexada por id; um
    ponto movido sem refazer a matriz carrega tempo de carro do lugar antigo.
+3. **Ao mover um ponto, apague do `geometria.json` as chaves que o citam** e
+   rode `python src/geometria.py`. Até 2026-11-09 o `construir_cache` não
+   atualizava a memória, e o `construir_ativos` em seguida regravava o arquivo
+   sem os traçados de carro recém-baixados (corrigido). Depois refaça as ruas
+   dos trechos na segurança e `python src/acessibilidade.py`.
 3. **Não rode duas builds de `geometria.py` ao mesmo tempo** — cada uma regrava o
    arquivo inteiro e o último vence.
 4. **`polilinha` devolve cópia.** Devolver a lista do cache deixava `extend()`

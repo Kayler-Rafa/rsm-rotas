@@ -214,7 +214,10 @@ PONTOS: List[Ponto] = [
     # --- Jaboatao dos Guararapes -------------------------------------------
     Ponto("ayrton_senna",     "Av. Ayrton Senna (Piedade)",          "parada",         -8.15880, -34.91322, "Jaboatao"),
     Ponto("piedade_orla",     "Orla de Piedade",                     "via",            -8.16328, -34.91265, "Jaboatao"),
-    Ponto("igreja_piedade",   "Igreja de N. Sra. da Piedade",        "origem_destino", -8.16850, -34.91541, "Jaboatao"),
+    # A igreja da BEIRA-MAR (Av. Beira Mar, Piedade; OSM way 539764741), nao a
+    # Paroquia N. Sra. da Piedade da Av. Bernardo Vieira de Melo (way 543607611),
+    # 140 m a oeste, onde o ponto estava ate 2026-11-09. Correcao do usuario.
+    Ponto("igreja_piedade",   "Igreja de N. Sra. da Piedade",        "origem_destino", -8.16925, -34.91424, "Jaboatao"),
 ]
 
 PONTO_POR_ID: Dict[str, Ponto] = {p.id: p for p in PONTOS}
