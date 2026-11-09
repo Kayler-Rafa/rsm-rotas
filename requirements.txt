@@ -1,0 +1,2 @@
+# Sem dependencias: o backend usa so a biblioteca padrao do Python.
+# Este arquivo existe para que Railway/Heroku reconhecam o projeto como Python.

@@ -22,6 +22,11 @@ from rede_rsm import CLIMAS, MODOS, PERFIS, PONTO_POR_ID, SEGURANCAS, TRANSITOS,
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(RAIZ, "web")
 
+# O Windows nao conhece esses tipos; sem eles o manifest do PWA e servido
+# como octet-stream e o navegador nao oferece "instalar app".
+mimetypes.add_type("application/manifest+json", ".webmanifest")
+mimetypes.add_type("text/javascript", ".js")
+
 _cache_rede = None
 
 
@@ -84,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", (tipo or "application/octet-stream")
                          + ("; charset=utf-8" if (tipo or "").startswith("text/")
-                            or (tipo or "").endswith("javascript") else ""))
+                            or (tipo or "").endswith(("javascript", "json")) else ""))
         self.send_header("Content-Length", str(len(corpo)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -191,10 +196,20 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    porta = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
-    srv = ThreadingHTTPServer(("127.0.0.1", porta), Handler)
+    # Em hospedagem (Render, Railway...) a porta vem de PORT e o servidor
+    # precisa aceitar conexoes de fora (0.0.0.0). Local, fica so na maquina.
+    porta_env = os.environ.get("PORT")
+    if len(sys.argv) > 1:
+        porta = int(sys.argv[1])
+    elif porta_env:
+        porta = int(porta_env)
+    else:
+        porta = 8000
+    host = os.environ.get("HOST") or ("0.0.0.0" if porta_env else "127.0.0.1")
+    srv = ThreadingHTTPServer((host, porta), Handler)
     print("RSM - Rotas Sustentaveis Multimodais")
-    print("Servidor em http://localhost:%d  (Ctrl+C para parar)" % porta)
+    print("Servidor em http://%s:%d  (Ctrl+C para parar)"
+          % ("localhost" if host == "127.0.0.1" else host, porta), flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

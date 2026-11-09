@@ -27,6 +27,33 @@ python -m unittest discover -s tests -v
 O mapa carrega tiles do OpenStreetMap e a biblioteca Leaflet por CDN, então a
 interface precisa de internet. Todo o cálculo de rotas é local.
 
+## No celular (PWA)
+
+O app é um **PWA**: instala como aplicativo, com ícone, sem barra do navegador.
+Para isso ele precisa estar publicado em HTTPS (veja *Publicar*).
+
+- **Android (Chrome):** abra o endereço → menu ⋮ → **Instalar app** (ou o
+  aviso "Adicionar à tela inicial").
+- **iPhone (Safari):** abra o endereço → Compartilhar → **Adicionar à Tela de
+  Início**.
+
+Sem internet o app ainda abre (a casca fica em cache), mas avisa que as rotas
+precisam de conexão: elas dependem de clima e trânsito atuais.
+
+## Publicar
+
+O repositório já traz `render.yaml`, `Procfile`, `requirements.txt` (vazio de
+propósito) e `runtime.txt`. O servidor lê a porta de `PORT` e, quando ela
+existe, escuta em `0.0.0.0`.
+
+**Render (grátis):** em <https://render.com>, entre com o GitHub → **New →
+Blueprint** → escolha este repositório → **Apply**. Em ~2 min sai um endereço
+`https://rsm-rotas.onrender.com` (ou parecido). No plano grátis o serviço dorme
+após 15 min sem uso; o primeiro acesso depois disso leva ~50 s.
+
+**Railway:** New Project → Deploy from GitHub → este repositório. Ele usa o
+`Procfile`. Depois, em *Settings → Networking*, gere um domínio.
+
 ## Duas telas
 
 ### `/` — o app
@@ -184,6 +211,7 @@ rotas/
 └── web/
     ├── tokens.css     cores claro/escuro, comum às duas telas
     ├── index.html · app.css · app.js      app do usuário   (/)
+    ├── manifest.webmanifest · sw.js · icones/   PWA (instalar no celular)
     └── admin.html · admin.css · admin.js  análise técnica  (/admin)
 ```
 

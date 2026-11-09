@@ -1,0 +1,19 @@
+{
+  "name": "RSM — Rotas Sustentáveis Multimodais",
+  "short_name": "RSM",
+  "description": "Rotas multimodais na Região Metropolitana do Recife: carro, ônibus, metrô, bicicleta e a pé.",
+  "lang": "pt-BR",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["navigation", "travel"],
+  "icons": [
+    { "src": "/icones/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

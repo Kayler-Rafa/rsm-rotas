@@ -4,8 +4,8 @@ Documento de handoff. Descreve o que existe, por que cada decisão foi tomada, o
 que está em aberto e onde mexer. Quem continuar o trabalho deve **atualizar este
 arquivo junto com o código** e **rodar os testes antes de declarar algo pronto**.
 
-Última atualização: 2026-09-23 (segurança viária com dado da CTTU, rotas que
-evitam vias perigosas, atualização automática a cada minuto).
+Última atualização: 2026-11-09 (PWA instalável no celular e arquivos de
+deploy; ver §9b).
 
 ```bash
 python src/server.py                          # app em http://localhost:8000, técnico em /admin
@@ -80,7 +80,9 @@ rotas/
 │   ├── nearest.json · geocodificacao.json   conferência de pontos
 └── web/
     ├── index.html · app.css · app.js      app do usuário (/), design do artifact
-    └── admin.html · admin.css · admin.js · tokens.css   análise técnica (/admin)
+    ├── admin.html · admin.css · admin.js · tokens.css   análise técnica (/admin)
+    └── manifest.webmanifest · sw.js · icones/           PWA (§9b)
+render.yaml · Procfile · requirements.txt · runtime.txt  deploy (§9b)
 ```
 
 Dependência: `server → motor → {algoritmos, clima, geometria} → rede_rsm`.
@@ -419,6 +421,34 @@ a acessibilidade **recalcula no servidor** em vez de só reordenar no navegador.
 
 **`/admin`** — tela técnica anterior (Pareto, Dijkstra × A\*, viabilidade,
 condições, NSGA-II), com `tokens.css` + `admin.css`.
+
+## 9b. PWA e deploy
+
+**Por que PWA e não React Native:** o mesmo código serve Android e iPhone, sem
+reescrever o frontend (Leaflet não roda em React Native) e sem conta da Apple.
+Se um dia precisar de APK de loja, empacote o PWA (Bubblewrap/TWA ou
+Capacitor), não reescreva.
+
+- `web/manifest.webmanifest`: nome, cores (#000, igual ao tema escuro), ícones.
+  O servidor registra o MIME `application/manifest+json`; o Windows não conhece
+  `.webmanifest` e, sem isso, o Chrome não oferece "Instalar app".
+- `web/sw.js`: casca (HTML/CSS/JS/ícones/Leaflet) **rede primeiro, cache como
+  reserva**; `/api/*` **sempre rede**, e sem rede devolve 503 com `erro` em JSON
+  (o app já mostra). Rota com clima velho é rota errada, por isso a API nunca é
+  servida do cache. Tiles do mapa não passam pelo SW. Mudou a lista da casca?
+  Troque `VERSAO` para limpar o cache antigo.
+- `web/icones/`: 192, 512 (também `maskable`; o desenho fica nos 60% centrais)
+  e `apple-touch-icon` 180. Gerados com Pillow uma vez; o backend continua só
+  stdlib.
+- **Deploy:** `server.py` lê `PORT`; se existe, escuta em `0.0.0.0` (`HOST`
+  sobrescreve). Sem `PORT`, continua em `127.0.0.1:8000`. `render.yaml`
+  (Render Blueprint, plano grátis), `Procfile` (Railway/Heroku),
+  `requirements.txt` vazio e `runtime.txt` só para a plataforma reconhecer
+  Python. O servidor grava cache de traçados em `dados/` em tempo de execução;
+  no Render o disco é efêmero, então esse cache se perde a cada deploy (não
+  quebra nada, só refaz consultas ao OSRM).
+- **PWA exige HTTPS** (ou `localhost`). Pela rede local (`http://192.168...`)
+  o celular abre o site, mas não instala.
 
 ---
 

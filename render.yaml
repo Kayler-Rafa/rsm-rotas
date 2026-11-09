@@ -1,0 +1,15 @@
+# Deploy no Render (https://render.com): New > Blueprint > escolha este repositorio.
+# Sem dependencias: o backend usa so a biblioteca padrao do Python.
+services:
+  - type: web
+    name: rsm-rotas
+    runtime: python
+    plan: free
+    buildCommand: "echo sem dependencias"
+    startCommand: "python src/server.py"
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: PYTHONUNBUFFERED
+        value: "1"
