@@ -70,7 +70,10 @@ rotas/
 │   ├── geometria.py   matriz e traçados do OSRM (tabela + rota), cache em dados/
 │   ├── clima.py       condições automáticas: Open-Meteo + trânsito por horário
 │   ├── seguranca.py   segurança viária por rua: sinistros da CTTU + comprimento do OSM
-│   ├── motor.py       consulta, descrição de rota, cards, viabilidade, serialização
+│   ├── motor.py       consulta, descrição de rota, viabilidade, serialização
+│   ├── cards.py       opções do app: cards, recomendação, segurança, contramão
+│   ├── local.py       GPS e busca de endereço (Nominatim)
+│   ├── eletropostos.py  eletropostos reais do OSM → dados/eletropostos_osm.json
 │   └── server.py      HTTP + parsing da query string
 ├── tests/test_rotas.py
 ├── dados/
@@ -547,6 +550,45 @@ Capacitor), não reescreva.
   o celular abre o site, mas não instala.
 
 ---
+
+## 9c. Em andamento (pausado em 2026-11-09, retomar daqui)
+
+**Acessibilidade pelo OSM — dados baixados, ainda não aplicados ao modelo.**
+
+- `dados/_barreiras_brutas.json`: 3.475 vias do OSM na caixa do corredor
+  (-8.20,-34.96,-7.99,-34.83), com `out tags geom`: `highway=steps` (769) e
+  `surface` = unpaved (2.026), sett (477), ground, dirt, cobblestone,
+  unhewn_cobblestone, sand, gravel, grass.
+- **Próximo passo:** para cada trecho não-metrô, pegar o traçado a pé real
+  (`geometria.json`, chave `u|v|foot`, `coords`) e medir quantos metros correm a
+  ≤ 10–12 m de uma barreira. Regra proposta: qualquer escada → não acessível;
+  > 100 m de sett/cobblestone/unpaved → não acessível. Gravar o resultado em
+  `dados/acessibilidade_osm.json` e fazer `rede_rsm.Trecho.acessivel` ler dele
+  (hoje é *proxy*; só a Ladeira da Sé é `False`). Cuidado com falso positivo de
+  rua transversal: a proximidade pega rua de paralelepípedo que só **cruza** a
+  rota — exigir sequência contínua de pontos da rota perto da mesma via.
+  Testes: `test_mobilidade_reduzida_nao_caminha_longe` e "0 pares sem rota no
+  modo acessível" (varredura) podem mudar; conferir que Sé continua só de carro.
+- **Wheelchair nas estações:** o OSM só tem `wheelchair=yes` em 3 estações
+  (Joana Bezerra, Antônio Falcão, Prazeres) e nenhum `no`. Insuficiente para
+  mudar o modelo.
+- **Ônibus no Marco Zero e na orla:** o OSM tem paradas (`highway=bus_stop`)
+  ali — Marco Zero 3 a < 300 m, Praça de Boa Viagem 6, Piedade 7 —, mas as
+  relações de linha (`route=bus`) do Recife estão incompletas (Boa Vista: 13
+  paradas, 0 linhas mapeadas). Não dá para confirmar quais linhas ligam esses
+  pontos; adicionar ônibus aos trechos seria inventar serviço. Decisão: não
+  adicionar; registrar como limitação de dado.
+
+**Também pendente da lista de melhorias:** ruas do Recife sem nenhum sinistro
+contarem como 0 (não "sem dado"). Plano: Overpass leve `way[highway][name]` na
+área do Recife com `out tags` (só nomes), gravar `ruas_recife` normalizadas no
+`seguranca_cttu.json`; em `risco_trecho`, rua sem registro na CTTU mas presente
+nessa lista entra com densidade 0 e conta para a cobertura.
+
+**Feito nesta rodada:** `motor.py` dividido — núcleo em `motor.py` (≈610
+linhas), opções do app em `src/cards.py` (cards, recomendação, segurança da
+rota, contramão, transporte público, recarga). `motor.opcoes_de_viagem` segue
+existindo (reexportado no fim de `motor.py`; `cards` importa `motor`).
 
 ## 10. O que falta
 
