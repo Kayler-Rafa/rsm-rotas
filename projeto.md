@@ -385,8 +385,8 @@ Resultado atual Sé → Piedade, tempo bom, trânsito normal:
 | Ônibus | 1 h 17 | R$ 4,50 | transporte público |
 | Bicicleta | 1 h 36 | R$ 0,00 | menor custo, menor emissão |
 
-Recarga no card do carro: **+25 min, +R$ 26,00** (Eletroposto Visconde de
-Jequitinhonha, rápido, sobre a rota — o acréscimo é só a carga, sem desvio).
+Recarga no card do carro: **+27 min, +R$ 26,00** (Eletroposto Joy Energy, Pina,
+rápido; real, do OSM, a 270 m do ponto — 2 min de desvio somados à carga).
 
 ---
 
@@ -565,7 +565,14 @@ Capacitor), não reescreva.
 - **Ônibus é corredor contínuo** Olinda–Piedade. Sem GTFS não dá para saber quais
   linhas existem; na prática exige baldeação.
 - ~~Transporte público nunca ganha card~~ — resolvido com o card próprio (§5).
-- Eletropostos e acessibilidade são *proxies*. O índice de segurança por modal
+- ~~Eletropostos inventados~~ — agora reais do OSM (`src/eletropostos.py` →
+  `dados/eletropostos_osm.json`; `rede_rsm.RECARGAS` lê o JSON e cai nas 7
+  posições antigas, `RECARGAS_ESTIMADAS`, só se ele faltar). Raio de 600 m até o
+  ponto, um por ponto (rápido primeiro), desvio ida e volta × 1,3 a 20 km/h
+  somado ao `tempo_min`, desenhado na posição real. **Potência estimada**: o
+  OSM do Recife não tem `socket:*`. O Overpass público oscila (502/timeout): o
+  script tenta 3 espelhos × 4 rodadas.
+- Acessibilidade é *proxy*. O índice de segurança por modal
   (`seguranca` na API, usado no custo de desconforto) também é *proxy*. O
   **filtro** de vias perigosas usa dado real (seção 4b).
 - Tarifas atualizadas em 2026-11-09: ônibus R$ 4,50 (Bilhete Único, desde

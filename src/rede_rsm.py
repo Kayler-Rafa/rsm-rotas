@@ -230,13 +230,16 @@ class Recarga:
     potencia_kw: float
     tempo_min: float    # parada tipica para uma recarga parcial util
     custo: float        # R$ da parada
+    # posicao REAL do eletroposto (OSM); None nas posicoes estimadas antigas
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    desvio_km: float = 0.0       # do ponto da rede ate o eletroposto
+    gratuito: bool = False       # fee=no no OSM
 
 
-# Eletropostos plausiveis ao longo do corredor. NAO sao dados oficiais: sao
-# posicoes aproximadas em pontos ja modelados da rede, para permitir testar a
-# funcionalidade de parada para recarga. Em producao devem vir de uma base de
-# eletropostos (PlugShare, MobiE, concessionarias) com disponibilidade real.
-RECARGAS: List[Recarga] = [
+# Reserva: as 7 posicoes plausiveis da primeira versao, usadas so se
+# dados/eletropostos_osm.json nao existir. NAO sao dados oficiais.
+RECARGAS_ESTIMADAS: List[Recarga] = [
     Recarga("rec_cruz_cabuga",   "cruz_cabuga",   "Eletroposto Av. Cruz Cabugá",
             "semirrapido", 22.0, 50.0, 22.00),
     Recarga("rec_recife_antigo", "recife_antigo", "Eletroposto Bairro do Recife",
@@ -252,6 +255,31 @@ RECARGAS: List[Recarga] = [
     Recarga("rec_cajueiro_seco", "cajueiro_seco", "Eletroposto TI Cajueiro Seco",
             "rapido", 50.0, 25.0, 26.00),
 ]
+
+
+
+def _carregar_recargas() -> List[Recarga]:
+    """Eletropostos REAIS do OpenStreetMap (src/eletropostos.py), cada um no
+    ponto da rede mais proximo, com o desvio ate ele somado ao tempo."""
+    import json
+    import os
+    caminho = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "dados", "eletropostos_osm.json")
+    try:
+        with open(caminho, encoding="utf-8") as fh:
+            itens = json.load(fh)["eletropostos"]
+    except (OSError, ValueError, KeyError):
+        return list(RECARGAS_ESTIMADAS)
+    ids = {p.id for p in PONTOS}
+    saida = [Recarga(str(e["id"]), str(e["ponto"]), str(e["nome"]), str(e["tipo"]),
+                     float(e["potencia_kw"]), float(e["tempo_min"]), float(e["custo"]),
+                     e.get("lat"), e.get("lon"), float(e.get("desvio_km") or 0.0),
+                     bool(e.get("gratuito")))
+             for e in itens if e.get("ponto") in ids]
+    return saida or list(RECARGAS_ESTIMADAS)
+
+
+RECARGAS: List[Recarga] = _carregar_recargas()
 
 # Modo que o usuario recarrega por conta propria. O carro de aplicativo nao
 # entra: quem cuida da carga e o motorista, nao o passageiro.

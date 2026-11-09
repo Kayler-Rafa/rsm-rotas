@@ -408,6 +408,24 @@ class TestRiscoNoturno(unittest.TestCase):
                                          (u, ar.destino))
 
 
+class TestEletropostosReais(unittest.TestCase):
+    """Eletropostos vem do OSM, perto do ponto, e o desvio entra no tempo."""
+
+    def test_eletropostos_sao_do_osm_e_perto_do_ponto(self):
+        import eletropostos
+        self.assertTrue(RECARGAS)
+        for r in RECARGAS:
+            self.assertIsNotNone(r.lat, r.id)               # posicao real, nao estimada
+            self.assertTrue(r.id.startswith("rec_osm_"), r.id)
+            p = PONTO_POR_ID[r.ponto]
+            from rede_rsm import Ponto
+            d = haversine_km(Ponto("_", "", "", r.lat, r.lon, ""), p)
+            self.assertLessEqual(d, eletropostos.RAIO_MAX_KM + 1e-6, r.nome)
+            base = eletropostos.TIPOS[r.tipo]["tempo_min"]
+            self.assertGreater(r.tempo_min, base, "desvio nao somado: %s" % r.nome)
+        self.assertEqual(len({r.ponto for r in RECARGAS}), len(RECARGAS))  # um por ponto
+
+
 class TestLocalizacao(unittest.TestCase):
     """GPS / endereco: liga a posicao ao ponto da rede mais proximo."""
 

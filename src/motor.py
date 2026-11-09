@@ -12,7 +12,7 @@ import geometria
 import seguranca
 from rede_rsm import (
     CLIMAS, CUSTO_ESTACIONAMENTO, FATOR_CARRO_G_KM, MODOS, MODO_RECARREGAVEL,
-    OPCOES_PADRAO, PERFIS, PONTOS, PONTO_POR_ID, RECARGAS, SEGURANCAS,
+    OPCOES_PADRAO, PERFIS, PONTOS, PONTO_POR_ID, RECARGAS, RECARGA_POR_PONTO, SEGURANCAS,
     TARIFA_SEI, TRANSITOS, TRECHOS, Aresta, GrafoMultimodal, No, Opcoes,
     VetorCusto, cenario_de, construir_grafo, distancia_trecho, haversine_km,
     nos_do_ponto, propriedades,
@@ -25,6 +25,14 @@ Pesos = Tuple[float, float, float, float]
 def _coords(ponto_id: str) -> List[float]:
     p = PONTO_POR_ID[ponto_id]
     return [p.lat, p.lon]
+
+
+def _coord_recarga(ponto_id: str) -> List[float]:
+    """Onde desenhar a parada: no eletroposto real, se houver; senao no ponto."""
+    r = RECARGA_POR_PONTO.get(ponto_id)
+    if r is not None and r.lat is not None and r.lon is not None:
+        return [r.lat, r.lon]
+    return _coords(ponto_id)
 
 
 def descrever_rota(g: GrafoMultimodal, caminho: List[No]) -> Dict[str, object]:
@@ -56,7 +64,7 @@ def descrever_rota(g: GrafoMultimodal, caminho: List[No]) -> Dict[str, object]:
                 "rotulo": a.rotulo,
                 "tempo": round(a.tempo, 2),
                 "custo": round(a.custo, 2),
-                "coord": _coords(u[0]),
+                "coord": _coord_recarga(u[0]),
             })
             continue
 
@@ -421,8 +429,10 @@ def rede_serializada() -> Dict[str, object]:
         "recargas": [{"id": r.id, "ponto": r.ponto, "nome": r.nome,
                       "tipo": r.tipo, "potencia_kw": r.potencia_kw,
                       "tempo_min": r.tempo_min, "custo": r.custo,
-                      "lat": PONTO_POR_ID[r.ponto].lat,
-                      "lon": PONTO_POR_ID[r.ponto].lon}
+                      "lat": r.lat if r.lat is not None else PONTO_POR_ID[r.ponto].lat,
+                      "lon": r.lon if r.lon is not None else PONTO_POR_ID[r.ponto].lon,
+                      "desvio_km": r.desvio_km, "gratuito": r.gratuito,
+                      "real": r.lat is not None}
                      for r in RECARGAS],
         "climas": [{"id": k, "rotulo": v["rotulo"], "descricao": v["descricao"]}
                    for k, v in CLIMAS.items()],

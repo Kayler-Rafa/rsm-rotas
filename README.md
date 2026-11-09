@@ -1,5 +1,7 @@
 # RSM — Rotas Sustentáveis Multimodais
 
+[![testes](https://github.com/Kayler-Rafa/rsm-rotas/actions/workflows/testes.yml/badge.svg)](https://github.com/Kayler-Rafa/rsm-rotas/actions/workflows/testes.yml) · **No ar:** <https://rsm-rotas.vercel.app>
+
 MVP web do sistema de recomendação de rotas sustentáveis para a Região
 Metropolitana do Recife, construído sobre a modelagem das Etapas 1 e 2 do
 projeto (Faculdade Nova Roma — Análise e Projeto de Complexidade de Algoritmos).
@@ -435,10 +437,13 @@ Estes números são **estimativa**, não medição:
   explicitados na própria aba.
 - A disponibilidade de frota compartilhada é tratada como opção binária, não
   como estado consultado em API de operador.
-- Os 7 eletropostos **não são dados oficiais**: são posições plausíveis em
-  pontos já modelados, para permitir testar a funcionalidade. Tempos e preços de
-  recarga (25 min / R$ 26,00 no rápido; 50 min / R$ 22,00 no semirrápido) são
-  estimativas. Em produção devem vir de uma base real com disponibilidade.
+- Os eletropostos são **reais**, do OpenStreetMap (`amenity=charging_station`):
+  dos 21 da região, 7 ficam a até 600 m de um ponto da rede e entram no modelo,
+  com o desvio de ida e volta somado à parada. O OSM do Recife não traz o tipo
+  de tomada, então a **potência é estimada** (shopping = AC 22 kW, 50 min; hub
+  pago da Joy Energy = rápido, 25 min). Onde o OSM marca `fee=no`, a energia é
+  gratuita; nos demais, R$ 22 / R$ 26 estimados. Disponibilidade não é
+  consultada.
 - A autonomia do veículo elétrico não é modelada: a recarga é uma parada que o
   usuário pede, não uma necessidade calculada a partir de bateria e distância.
 - O tempo típico de via é o fluxo livre do OSRM × 1,647 (índice TomTom de
