@@ -9,7 +9,7 @@ deploy; ver §9b).
 
 ```bash
 python src/server.py                          # app em http://localhost:8000, técnico em /admin
-python -m unittest discover -s tests -v       # 27 testes de corretude (~2 min)
+python -m unittest discover -s tests -v       # 36 testes de corretude (~2 min)
 python src/geometria.py                       # rebaixa matriz e traçados do OSRM (rede mudou)
 python src/geometria.py --bike-legal          # só as distâncias legais de bike (aviso de contramão)
 python src/seguranca.py                       # rebaixa sinistros da CTTU e comprimentos do OSM
@@ -74,6 +74,7 @@ rotas/
 │   ├── cards.py       opções do app: cards, recomendação, segurança, contramão
 │   ├── local.py       GPS e busca de endereço (Nominatim)
 │   ├── eletropostos.py  eletropostos reais do OSM → dados/eletropostos_osm.json
+│   ├── acessibilidade.py  escadas e piso irregular do OSM → dados/acessibilidade_osm.json
 │   └── server.py      HTTP + parsing da query string
 ├── tests/test_rotas.py
 ├── dados/
@@ -279,9 +280,16 @@ esse nível nunca é tratado nem exibido como seguro.
 6. Os nomes são casados primeiro de forma exata. Se falhar, compara sem o tipo
    da via ("RUA Visconde de Jequitinhonha" na CTTU é "Avenida" no OSM).
 7. Risco do trecho = média ponderada por km. O trecho só é julgado se ≥ 50% dele
-   tem dado. Uma rua do Recife **sem nenhum sinistro registrado** também conta
-   como sem dado, porque o JSON só guarda ruas que aparecem na CTTU. Guardar a
-   lista de ruas do OSM permitiria contá-la como 0; ainda não foi feito.
+   tem dado. Uma rua do Recife **sem nenhum sinistro registrado** conta como
+   **zero** (2026-11-09): `seguranca_cttu.json` guarda `ruas_recife` (8.911 nomes
+   normalizados do OSM; `python src/seguranca.py --ruas
+   dados/_ruas_recife_osm.json`), e `risco_trecho` usa `ZERO_SINISTROS` para rua
+   achada ali e em nenhum registro da CTTU. **Só com as duas pontas do trecho no
+   Recife**: um nome de Olinda que também exista no Recife não vira zero. Efeito:
+   8 trechos saem de "sem dado" para "ok" e 6 de "atenção" para "ok" (as ruas
+   calmas do trecho passam a pesar na média); os 6 inseguros continuam. Risco:
+   uma grafia da CTTU que não case com o OSM vira zero; o casamento por núcleo
+   (sem o tipo de via) reduz isso.
 8. A rua citada no aviso é a que mais pesa no veredito (km × densidade),
    priorizando as que têm ≥ 5 sinistros, e não a de maior densidade.
 
@@ -419,7 +427,7 @@ rápido; real, do OSM, a 270 m do ponto — 2 min de desvio somados à carga).
 
 ## 7. Testes (`tests/test_rotas.py`)
 
-27 testes, stdlib `unittest`, ~2 min. Cada um verifica uma **propriedade** que tem
+36 testes, stdlib `unittest`, ~2 min. Cada um verifica uma **propriedade** que tem
 de valer, não um número copiado da saída:
 
 | Teste | Garante |
@@ -551,44 +559,43 @@ Capacitor), não reescreva.
 
 ---
 
-## 9c. Em andamento (pausado em 2026-11-09, retomar daqui)
+## 9c. Acessibilidade medida no OSM (`acessibilidade.py`, 2026-11-09)
 
-**Acessibilidade pelo OSM — dados baixados, ainda não aplicados ao modelo.**
+`python src/acessibilidade.py [--baixar]` → `dados/acessibilidade_osm.json`.
 
-- `dados/_barreiras_brutas.json`: 3.475 vias do OSM na caixa do corredor
-  (-8.20,-34.96,-7.99,-34.83), com `out tags geom`: `highway=steps` (769) e
-  `surface` = unpaved (2.026), sett (477), ground, dirt, cobblestone,
-  unhewn_cobblestone, sand, gravel, grass.
-- **Próximo passo:** para cada trecho não-metrô, pegar o traçado a pé real
-  (`geometria.json`, chave `u|v|foot`, `coords`) e medir quantos metros correm a
-  ≤ 10–12 m de uma barreira. Regra proposta: qualquer escada → não acessível;
-  > 100 m de sett/cobblestone/unpaved → não acessível. Gravar o resultado em
-  `dados/acessibilidade_osm.json` e fazer `rede_rsm.Trecho.acessivel` ler dele
-  (hoje é *proxy*; só a Ladeira da Sé é `False`). Cuidado com falso positivo de
-  rua transversal: a proximidade pega rua de paralelepípedo que só **cruza** a
-  rota — exigir sequência contínua de pontos da rota perto da mesma via.
-  Testes: `test_mobilidade_reduzida_nao_caminha_longe` e "0 pares sem rota no
-  modo acessível" (varredura) podem mudar; conferir que Sé continua só de carro.
-- **Wheelchair nas estações:** o OSM só tem `wheelchair=yes` em 3 estações
-  (Joana Bezerra, Antônio Falcão, Prazeres) e nenhum `no`. Insuficiente para
-  mudar o modelo.
-- **Ônibus no Marco Zero e na orla:** o OSM tem paradas (`highway=bus_stop`)
-  ali — Marco Zero 3 a < 300 m, Praça de Boa Viagem 6, Piedade 7 —, mas as
+- **Barreiras:** vias do OSM com `highway=steps` ou piso irregular (`surface` =
+  sett, cobblestone, unhewn_cobblestone, unpaved, ground, dirt, sand, gravel,
+  grass) na caixa do corredor; brutos em `dados/_barreiras_brutas.json`
+  (3.475 vias).
+- **Medição:** cada caminho é amostrado a cada 5 m; conta a amostra a ≤ 4 m de
+  uma barreira (o traçado do roteador fica *em cima* da via que usa; a paralela
+  fica a 8–10 m). Só conta sequência contínua ≥ 30 m na **mesma** via: rua de
+  paralelepípedo que só **cruza** a rota fica de fora. Áreas (`area=yes`,
+  praças) são ignoradas: o contorno do polígono não é caminho. Na rota de carro,
+  só barreira em via de carro conta.
+- **Veredito:** o trecho é acessível se **algum** caminho entre as pontas (a pé
+  nos dois sentidos, ou pela via, de carro, nos dois sentidos) não tem escada e
+  tem ≤ 100 m de piso irregular. "A rota a pé tem escada" não é "não existe
+  caminho acessível".
+- **Resultado:** só **Sé → Carmo** é inacessível (Travessa Conselheiro João
+  Alfredo e Rua Bispo Coutinho, paralelepípedo) — o OSM confirma o que o modelo
+  assumia. Em 7 trechos a rota a pé comum tem barreira (passarela com escada,
+  rua de terra, paralelepípedo) e o acessível vai pela calçada da avenida, mais
+  longa: `rede_rsm.distancia_pe_acessivel` usa esse caminho no modo acessível
+  (Estação Shopping → Domingos Ferreira: 2,25 → 3,50 km).
+- `rede_rsm.trecho_acessivel(t)` = `t.acessivel` **e** a medição; só restringe.
+- **Limite:** o OSM do Recife quase não marca largura de calçada, rampa nem
+  meio-fio rebaixado. Ausência de barreira mapeada não prova calçada boa.
+- **Wheelchair nas estações:** só 3 com `wheelchair=yes` e nenhuma `no`;
+  insuficiente para mudar o modelo.
+- **Ônibus no Marco Zero e na orla — decidido não adicionar.** Há paradas no
+  OSM (Marco Zero 3 a < 300 m, Praça de Boa Viagem 6, Piedade 7), mas as
   relações de linha (`route=bus`) do Recife estão incompletas (Boa Vista: 13
-  paradas, 0 linhas mapeadas). Não dá para confirmar quais linhas ligam esses
-  pontos; adicionar ônibus aos trechos seria inventar serviço. Decisão: não
-  adicionar; registrar como limitação de dado.
+  paradas, 0 linhas). Sem confirmar a linha, pôr ônibus no trecho seria
+  inventar serviço.
 
-**Também pendente da lista de melhorias:** ruas do Recife sem nenhum sinistro
-contarem como 0 (não "sem dado"). Plano: Overpass leve `way[highway][name]` na
-área do Recife com `out tags` (só nomes), gravar `ruas_recife` normalizadas no
-`seguranca_cttu.json`; em `risco_trecho`, rua sem registro na CTTU mas presente
-nessa lista entra com densidade 0 e conta para a cobertura.
-
-**Feito nesta rodada:** `motor.py` dividido — núcleo em `motor.py` (≈610
-linhas), opções do app em `src/cards.py` (cards, recomendação, segurança da
-rota, contramão, transporte público, recarga). `motor.opcoes_de_viagem` segue
-existindo (reexportado no fim de `motor.py`; `cards` importa `motor`).
+**Também na mesma rodada:** `motor.py` dividido — núcleo em `motor.py`, opções do
+app em `src/cards.py`; `motor.opcoes_de_viagem` reexportado no fim de `motor.py`.
 
 ## 10. O que falta
 
@@ -614,7 +621,7 @@ existindo (reexportado no fim de `motor.py`; `cards` importa `motor`).
   somado ao `tempo_min`, desenhado na posição real. **Potência estimada**: o
   OSM do Recife não tem `socket:*`. O Overpass público oscila (502/timeout): o
   script tenta 3 espelhos × 4 rodadas.
-- Acessibilidade é *proxy*. O índice de segurança por modal
+- ~~Acessibilidade proxy~~ — medida no OSM (§9c). O índice de segurança por modal
   (`seguranca` na API, usado no custo de desconforto) também é *proxy*. O
   **filtro** de vias perigosas usa dado real (seção 4b).
 - Tarifas atualizadas em 2026-11-09: ônibus R$ 4,50 (Bilhete Único, desde

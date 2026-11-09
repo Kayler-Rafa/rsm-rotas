@@ -1,0 +1,342 @@
+{
+ "fonte": "OpenStreetMap (highway=steps, surface irregular), via Overpass",
+ "criterio": {
+  "raio_m": 4.0,
+  "min_trecho_m": 30.0,
+  "max_piso_m": 100.0,
+  "pisos": [
+   "sett",
+   "cobblestone",
+   "unhewn_cobblestone",
+   "unpaved",
+   "ground",
+   "dirt",
+   "sand",
+   "gravel",
+   "grass"
+  ]
+ },
+ "gerado_em": "2026-11-09",
+ "trechos": {
+  "se_olinda|carmo": {
+   "acessivel": false,
+   "escada_m": 0,
+   "piso_m": 175,
+   "vias": [
+    [
+     "Travessa Conselheiro João Alfredo (sett)",
+     130
+    ],
+    [
+     "Rua Bispo Coutinho (sett)",
+     45
+    ]
+   ],
+   "caminho": "pela via (ida)",
+   "km": 0.739,
+   "barreira_na_rota_a_pe": true
+  },
+  "carmo|olinda_agamenon": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.6,
+   "barreira_na_rota_a_pe": false
+  },
+  "olinda_agamenon|cruz_cabuga": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 2.438,
+   "barreira_na_rota_a_pe": false
+  },
+  "cruz_cabuga|boa_vista": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 2.427,
+   "barreira_na_rota_a_pe": false
+  },
+  "boa_vista|est_recife": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 2.207,
+   "barreira_na_rota_a_pe": false
+  },
+  "est_recife|sao_jose": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.109,
+   "barreira_na_rota_a_pe": false
+  },
+  "sao_jose|ponte_pg": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.452,
+   "barreira_na_rota_a_pe": false
+  },
+  "ponte_pg|pina": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 0.26,
+   "barreira_na_rota_a_pe": false
+  },
+  "pina|df_norte": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.147,
+   "barreira_na_rota_a_pe": false
+  },
+  "df_norte|df_centro": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 2.7,
+   "barreira_na_rota_a_pe": false
+  },
+  "df_centro|jequitinhonha": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.912,
+   "barreira_na_rota_a_pe": false
+  },
+  "jequitinhonha|ayrton_senna": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 3.384,
+   "barreira_na_rota_a_pe": false
+  },
+  "ayrton_senna|igreja_piedade": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.407,
+   "barreira_na_rota_a_pe": false
+  },
+  "boa_vista|recife_antigo": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.946,
+   "barreira_na_rota_a_pe": false
+  },
+  "recife_antigo|sto_antonio": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.202,
+   "barreira_na_rota_a_pe": false
+  },
+  "sto_antonio|est_recife": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 0.939,
+   "barreira_na_rota_a_pe": false
+  },
+  "sao_jose|joana_bezerra": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "pela via (ida)",
+   "km": 0.956,
+   "barreira_na_rota_a_pe": true
+  },
+  "pina|bv_norte": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "pela via (ida)",
+   "km": 2.561,
+   "barreira_na_rota_a_pe": true
+  },
+  "bv_norte|praca_bv": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 4.112,
+   "barreira_na_rota_a_pe": false
+  },
+  "praca_bv|setubal": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 0.919,
+   "barreira_na_rota_a_pe": false
+  },
+  "setubal|piedade_orla": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 3.102,
+   "barreira_na_rota_a_pe": false
+  },
+  "piedade_orla|igreja_piedade": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 0.741,
+   "barreira_na_rota_a_pe": false
+  },
+  "bv_norte|df_norte": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "pela via (ida)",
+   "km": 1.689,
+   "barreira_na_rota_a_pe": true
+  },
+  "praca_bv|jequitinhonha": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 0.271,
+   "barreira_na_rota_a_pe": false
+  },
+  "piedade_orla|ayrton_senna": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 0.666,
+   "barreira_na_rota_a_pe": false
+  },
+  "imbiribeira|df_norte": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 4.712,
+   "barreira_na_rota_a_pe": false
+  },
+  "antonio_falcao|df_centro": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.842,
+   "barreira_na_rota_a_pe": false
+  },
+  "shopping|df_centro": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "pela via (ida)",
+   "km": 3.498,
+   "barreira_na_rota_a_pe": true
+  },
+  "tancredo_neves|jequitinhonha": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 35,
+   "vias": [
+    [
+     "Rua Cabo Gonçalo de Paiva (unpaved)",
+     35
+    ]
+   ],
+   "caminho": "a pe",
+   "km": 2.052,
+   "barreira_na_rota_a_pe": false
+  },
+  "aeroporto|jequitinhonha": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.703,
+   "barreira_na_rota_a_pe": false
+  },
+  "porta_larga|ayrton_senna": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.899,
+   "barreira_na_rota_a_pe": false
+  },
+  "monte_guararapes|ayrton_senna": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "a pe",
+   "km": 1.024,
+   "barreira_na_rota_a_pe": false
+  },
+  "prazeres|ayrton_senna": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "pela via (ida)",
+   "km": 2.254,
+   "barreira_na_rota_a_pe": true
+  },
+  "cajueiro_seco|igreja_piedade": {
+   "acessivel": true,
+   "escada_m": 0,
+   "piso_m": 0,
+   "vias": [],
+   "caminho": "pela via (ida)",
+   "km": 3.396,
+   "barreira_na_rota_a_pe": true
+  }
+ }
+}

@@ -543,6 +543,40 @@ def _vias_do_trecho(u: str, v: str, modo: Optional[str] = None) -> List[List[obj
     return trechos.get("%s|%s" % (u, v)) or trechos.get("%s|%s" % (v, u)) or []
 
 
+# Rua do Recife sem nenhum sinistro na CTTU: entra como zero. A lista de ruas
+# vem do OSM (atualizar_ruas_recife), normalizada como os nomes da CTTU.
+ZERO_SINISTROS: Dict[str, object] = {
+    "sinistros": 0, "com_vitima": 0, "pedestre": 0, "ciclista": 0, "fatais": 0,
+    "sinistros_noite": 0, "pedestre_noite": 0, "ciclista_noite": 0, "sem_hora": 0,
+    "km": KM_MINIMO_DENSIDADE, "sem_registro": True,
+}
+_ruas: Optional[Dict[str, set]] = None
+
+
+def rua_do_recife(nome: str) -> bool:
+    """A rua existe no Recife segundo o OSM (nome exato ou sem o tipo de via)?"""
+    global _ruas
+    if _ruas is None:
+        lista = carregar().get("ruas_recife") or []            # type: ignore[union-attr]
+        _ruas = {"nome": set(lista), "nucleo": {nucleo(n) for n in lista}}
+    n = normalizar(nome)
+    return n in _ruas["nome"] or nucleo(n) in _ruas["nucleo"]
+
+
+def atualizar_ruas_recife(caminho: str) -> None:
+    """Grava no JSON da seguranca os nomes (normalizados) das ruas do Recife."""
+    global _ruas, _dados
+    with open(caminho, encoding="utf-8") as fh:
+        nomes = json.load(fh)
+    d = dict(carregar())
+    d["ruas_recife"] = sorted({normalizar(n) for n in nomes if n})
+    with open(ARQUIVO, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False)
+    _dados, _ruas = None, None
+    _risco_cache.clear()
+    print("%d ruas do Recife gravadas" % len(d["ruas_recife"]))
+
+
 def risco_trecho(u: str, v: str, modo: Optional[str] = None,
                  turno: str = "dia") -> Dict[str, object]:
     """Risco de um trecho do modelo para quem anda e para quem pedala.
@@ -565,12 +599,20 @@ def risco_trecho(u: str, v: str, modo: Optional[str] = None,
     com_dado = 0.0
     soma = {"pedestre": 0.0, "ciclista": 0.0}
     anos = len(d.get("anos") or []) or 3                      # type: ignore[arg-type]
+    from rede_rsm import PONTO_POR_ID
+    no_recife = all(PONTO_POR_ID[x].municipio == "Recife" for x in (u, v) if x in PONTO_POR_ID)
     for item in vias:
         nome, km = item[0], item[1]
         exibicao = item[2] if len(item) > 2 else nome.title()
         a = por_via.get(nome)
         if not a or not a.get("km"):
             a = por_nucleo.get(nucleo(nome))          # tipo de via divergente
+        if a is None and no_recife and rua_do_recife(nome):
+            # Rua que existe no Recife (OSM) e nao aparece em nenhum sinistro da
+            # CTTU em 3 anos: zero registrado, nao "sem dado". So vale com as
+            # duas pontas no Recife - um nome de Olinda que tambem exista no
+            # Recife nao pode virar "zero sinistros".
+            a = dict(ZERO_SINISTROS)
         if not a or not a.get("km"):
             continue                                  # rua fora do Recife ou sem nome casavel
         dens = {t: _densidade(a, t, anos) for t in soma}
@@ -580,6 +622,7 @@ def risco_trecho(u: str, v: str, modo: Optional[str] = None,
             soma[t] += float(km) * veredito[t]
         saida["vias"].append({                                # type: ignore[union-attr]
             "nome": exibicao, "km_no_trecho": km, "sinistros": a["sinistros"],
+            "sem_registro": bool(a.get("sem_registro")),
             "pedestre": a["pedestre"], "ciclista": a["ciclista"],
             "fatais": a["fatais"], "pedestre_km_ano": round(dens["pedestre"], 3),
             "ciclista_km_ano": round(dens["ciclista"], 3),
@@ -637,6 +680,9 @@ def fonte() -> Dict[str, object]:
 if __name__ == "__main__":
     if "--turnos" in sys.argv:
         atualizar_turnos()
+        sys.exit(0)
+    if "--ruas" in sys.argv:
+        atualizar_ruas_recife(sys.argv[sys.argv.index("--ruas") + 1])
         sys.exit(0)
     construir()
     if "--vias" in sys.argv:

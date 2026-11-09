@@ -577,6 +577,47 @@ def haversine_km(a: Ponto, b: Ponto) -> float:
     return 2 * r * math.asin(math.sqrt(h))
 
 
+# Acessibilidade MEDIDA no OSM (src/acessibilidade.py): escadas e piso
+# irregular ao longo de cada caminho possivel do trecho. So restringe: o que o
+# modelo ja marcava como inacessivel continua inacessivel.
+_ACESSIBILIDADE: Optional[Dict[str, Dict[str, object]]] = None
+
+
+def _acessibilidade_osm() -> Dict[str, Dict[str, object]]:
+    global _ACESSIBILIDADE
+    if _ACESSIBILIDADE is None:
+        import json
+        import os
+        caminho = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               "dados", "acessibilidade_osm.json")
+        try:
+            with open(caminho, encoding="utf-8") as fh:
+                _ACESSIBILIDADE = json.load(fh)["trechos"]
+        except (OSError, ValueError, KeyError):
+            _ACESSIBILIDADE = {}
+    return _ACESSIBILIDADE
+
+
+def _medida(t: "Trecho") -> Optional[Dict[str, object]]:
+    d = _acessibilidade_osm()
+    return d.get("%s|%s" % (t.u, t.v)) or d.get("%s|%s" % (t.v, t.u))
+
+
+def trecho_acessivel(t: "Trecho") -> bool:
+    m = _medida(t)
+    return t.acessivel and (m is None or bool(m.get("acessivel")))
+
+
+def distancia_pe_acessivel(t: "Trecho") -> float:
+    """Extensao a pe para quem tem mobilidade reduzida: se o atalho a pe tem
+    escada ou piso irregular, vale o caminho sem barreira (mais longo)."""
+    base = distancia_trecho(t, "pe")
+    m = _medida(t)
+    if m and m.get("acessivel") and m.get("barreira_na_rota_a_pe") and m.get("km"):
+        return max(base, float(m["km"]))      # type: ignore[arg-type]
+    return base
+
+
 def onibus_osrm(u: str, v: str) -> Optional[Tuple[float, float]]:
     """(km, min em fluxo livre) do onibus entre dois pontos do corredor.
 
@@ -686,7 +727,8 @@ def custo_deslocamento(t: Trecho, modo: str, cen: Cenario,
                        flag: int, rec: int) -> Aresta:
     """Vetor de custo de um trecho percorrido em um modo, sob um cenario."""
     m = MODOS[modo]
-    dist = distancia_trecho(t, modo)
+    dist = (distancia_pe_acessivel(t) if modo == "pe" and cen.exigir_acessivel
+            else distancia_trecho(t, modo))
     exposto = modo in MODOS_EXPOSTOS
 
     tempo = None
@@ -714,7 +756,7 @@ def custo_deslocamento(t: Trecho, modo: str, cen: Cenario,
 
     alpha = cen.fator_desconforto if exposto else 1.0
     desconforto = dist * m.desconforto_km * (2.0 - t.seguranca) * alpha
-    if not t.acessivel:
+    if not trecho_acessivel(t):
         desconforto *= 1.30
 
     return Aresta(
@@ -821,7 +863,7 @@ def construir_grafo(opcoes: Optional[Opcoes] = None,
 
     # 1) Arestas de deslocamento (bidirecionais dentro de cada camada modal)
     for t in TRECHOS:
-        if cen.exigir_acessivel and not t.acessivel:
+        if cen.exigir_acessivel and not trecho_acessivel(t):
             continue
         if t.seguranca < cen.seguranca_min:
             continue
@@ -830,7 +872,7 @@ def construir_grafo(opcoes: Optional[Opcoes] = None,
             if not modo_ok(modo):
                 continue
             if (cen.exigir_acessivel and modo == "pe"
-                    and distancia_trecho(t, "pe") > LIMITE_PE_ACESSIVEL_KM):
+                    and distancia_pe_acessivel(t) > LIMITE_PE_ACESSIVEL_KM):
                 continue
             # Seguranca viaria medida: quem anda ou pedala nao e mandado por via
             # entre as 10% mais perigosas do Recife para o seu tipo de usuario.

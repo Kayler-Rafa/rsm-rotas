@@ -12,7 +12,7 @@ from rede_rsm import (
     OPCOES_PADRAO, PERFIS, PONTOS, PONTO_POR_ID, RECARGAS, RECARGA_POR_PONTO, SEGURANCAS,
     TARIFA_SEI, TRANSITOS, TRECHOS, Aresta, GrafoMultimodal, No, Opcoes,
     VetorCusto, cenario_de, construir_grafo, distancia_trecho, haversine_km,
-    nos_do_ponto, propriedades,
+    nos_do_ponto, propriedades, trecho_acessivel,
 )
 
 Pesos = Tuple[float, float, float, float]
@@ -401,7 +401,7 @@ def rede_serializada() -> Dict[str, object]:
             "u": t.u, "v": t.v,
             "modos": list(t.modos),
             "seguranca": t.seguranca,
-            "acessivel": t.acessivel,
+            "acessivel": trecho_acessivel(t),
             "infra": t.infra,
             "dist_km": round(distancia_trecho(t), 2),
             "coords": [_coords(t.u), _coords(t.v)],

@@ -408,6 +408,64 @@ class TestRiscoNoturno(unittest.TestCase):
                                          (u, ar.destino))
 
 
+class TestRuasSemSinistro(unittest.TestCase):
+    """Rua do Recife sem registro na CTTU conta como zero, nao como 'sem dado'."""
+
+    def test_rua_do_recife_sem_sinistro_conta_como_zero(self):
+        import seguranca
+        r = seguranca.risco_trecho("df_centro", "shopping", "pe")
+        self.assertTrue(r["tem_dado"])
+        self.assertEqual(r["cobertura"], 1.0)
+        self.assertTrue(any(v["sem_registro"] for v in r["vias"]))
+        for v in r["vias"]:
+            if v["sem_registro"]:
+                self.assertEqual(v["sinistros"], 0)
+
+    def test_zero_so_vale_no_recife(self):
+        import seguranca
+        # trecho de Olinda: mesmo que um nome exista no Recife, nada vira zero
+        r = seguranca.risco_trecho("se_olinda", "carmo", "pe")
+        self.assertFalse(any(v.get("sem_registro") for v in r["vias"]))
+        self.assertEqual(seguranca.nivel("se_olinda", "carmo", "pe"), "sem_dado")
+
+
+class TestAcessibilidadeMedida(unittest.TestCase):
+    """Acessibilidade medida no OSM: escada e piso irregular ao longo do caminho."""
+
+    def test_ladeira_da_se_e_inacessivel_pelo_dado(self):
+        from rede_rsm import TRECHOS, _medida, trecho_acessivel
+        t = next(t for t in TRECHOS if (t.u, t.v) == ("se_olinda", "carmo"))
+        m = _medida(t)
+        self.assertIsNotNone(m)
+        self.assertFalse(m["acessivel"])
+        self.assertGreater(m["piso_m"], 100)             # paralelepipedo de Olinda
+        self.assertFalse(trecho_acessivel(t))
+
+    def test_medicao_so_restringe(self):
+        from rede_rsm import TRECHOS, trecho_acessivel
+        for t in TRECHOS:
+            if not t.acessivel:
+                self.assertFalse(trecho_acessivel(t), (t.u, t.v))
+
+    def test_caminho_acessivel_nunca_e_mais_curto(self):
+        from rede_rsm import TRECHOS, distancia_pe_acessivel, distancia_trecho
+        for t in TRECHOS:
+            if "pe" in t.modos:
+                self.assertGreaterEqual(distancia_pe_acessivel(t), distancia_trecho(t, "pe"))
+
+    def test_cruzar_rua_de_paralelepipedo_nao_conta(self):
+        """Uma via de barreira PERPENDICULAR a rota da < MIN_TRECHO_M de sequencia."""
+        import acessibilidade as A
+        barreira = [{"type": "way", "id": 1, "tags": {"highway": "residential", "surface": "sett"},
+                     "geometry": [{"lat": -8.0900, "lon": -34.9000},
+                                  {"lat": -8.0900, "lon": -34.8990}]}]
+        grade = A._indice(barreira)
+        cruza = [[-8.0910, -34.8995], [-8.0890, -34.8995]]      # norte-sul, cruza
+        ao_longo = [[-8.0900, -34.9000], [-8.0900, -34.8990]]  # em cima da via, 110 m
+        self.assertEqual(A.medir(cruza, grade)["piso_m"], 0)
+        self.assertGreater(A.medir(ao_longo, grade)["piso_m"], 90)
+
+
 class TestEletropostosReais(unittest.TestCase):
     """Eletropostos vem do OSM, perto do ponto, e o desvio entra no tempo."""
 

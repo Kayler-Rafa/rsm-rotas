@@ -212,7 +212,7 @@ rotas/
 │   ├── motor.py       consulta, rota, cards do app e análise de viabilidade
 │   └── server.py      servidor HTTP (biblioteca padrão)
 ├── tests/
-│   └── test_rotas.py  27 testes de corretude das rotas, dos algoritmos e da segurança
+│   └── test_rotas.py  36 testes de corretude das rotas, dos algoritmos e da segurança
 ├── dados/
 │   ├── matriz_carro.json   distância e tempo de carro entre os 30 pontos (OSRM)
 │   ├── geometria.json      traçados reais (OSRM)
@@ -430,8 +430,11 @@ Estes números são **estimativa**, não medição:
   quais linhas existem.
 - Mobilidade reduzida é modelada com caminhada a 3 km/h e no máximo 0,8 km por
   trecho a pé. São parâmetros de produto, não medição.
-- Os índices de segurança e a marcação de acessibilidade são *proxies*
-  atribuídos por tipo de via, não levantamento de campo.
+- O índice de segurança por modal (desconforto) é *proxy* por tipo de via. A
+  acessibilidade é **medida no OpenStreetMap** (escadas e piso irregular ao
+  longo de cada caminho), mas o OSM do Recife quase não marca rampa, meio-fio
+  rebaixado nem largura de calçada: ausência de barreira mapeada não prova
+  calçada boa.
 - Os limiares de viabilidade (120 min / R$ 25 para inviável; 75 min / R$ 12 para
   limítrofe) são juízo de produto, não resultado de algoritmo, e estão
   explicitados na própria aba.
