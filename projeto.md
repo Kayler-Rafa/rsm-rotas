@@ -447,6 +447,15 @@ Capacitor), não reescreva.
   Python. O servidor grava cache de traçados em `dados/` em tempo de execução;
   no Render o disco é efêmero, então esse cache se perde a cada deploy (não
   quebra nada, só refaz consultas ao OSRM).
+- **Produção atual: Vercel**, <https://rsm-rotas.vercel.app> (projeto
+  `rsm-rotas`, conta `kayler-rafa`). `api/index.py` reexporta o `Handler` do
+  `server.py` como `handler` (a função Python da Vercel aceita uma classe
+  `BaseHTTPRequestHandler`, então continua sem framework). `vercel.json` usa
+  `builds` + `routes` mandando tudo para essa função, com `src/`, `web/` e
+  `dados/` incluídos. Não use `functions` no topo: a Vercel detecta o projeto
+  como "serviço Python" e recusa. Disco somente leitura: a gravação do cache de
+  traçados falha em silêncio (já protegida por `OSError`). Redeploy:
+  `vercel deploy --prod --yes`.
 - **PWA exige HTTPS** (ou `localhost`). Pela rede local (`http://192.168...`)
   o celular abre o site, mas não instala.
 

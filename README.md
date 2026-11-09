@@ -42,7 +42,10 @@ precisam de conexão: elas dependem de clima e trânsito atuais.
 
 ## Publicar
 
-O repositório já traz `render.yaml`, `Procfile`, `requirements.txt` (vazio de
+**No ar:** <https://rsm-rotas.vercel.app> (Vercel; `api/index.py` +
+`vercel.json`). Para publicar de novo: `vercel deploy --prod --yes`.
+
+Alternativas: o repositório também traz `render.yaml`, `Procfile`, `requirements.txt` (vazio de
 propósito) e `runtime.txt`. O servidor lê a porta de `PORT` e, quando ela
 existe, escuta em `0.0.0.0`.
 
