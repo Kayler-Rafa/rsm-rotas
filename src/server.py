@@ -16,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import clima
+import local
 import motor
 from rede_rsm import CLIMAS, MODOS, PERFIS, PONTO_POR_ID, SEGURANCAS, TRANSITOS, Opcoes
 
@@ -118,6 +119,24 @@ class Handler(BaseHTTPRequestHandler):
                 if _cache_rede is None:
                     _cache_rede = motor.rede_serializada()
                 return self._json(_cache_rede)
+
+            if rota == "/api/proximo":
+                try:
+                    lat = float((params.get("lat") or [""])[0])
+                    lon = float((params.get("lon") or [""])[0])
+                except ValueError:
+                    return self._json({"erro": "lat e lon sao obrigatorios."}, 400)
+                if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                    return self._json({"erro": "Coordenada invalida."}, 400)
+                return self._json(local.proximos(lat, lon,
+                                                 acessivel=_bool(params, "acessivel")))
+
+            if rota == "/api/buscar":
+                q = (params.get("q") or [""])[0]
+                try:
+                    return self._json({"q": q, "resultados": local.buscar(q)})
+                except RuntimeError as exc:
+                    return self._json({"erro": str(exc), "resultados": []}, 503)
 
             origem = _valida(params, "origem", PONTO_POR_ID, "se_olinda")
             destino = _valida(params, "destino", PONTO_POR_ID, "igreja_piedade")

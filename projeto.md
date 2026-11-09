@@ -490,6 +490,25 @@ a acessibilidade **recalcula no servidor** em vez de só reordenar no navegador.
 **`/admin`** — tela técnica anterior (Pareto, Dijkstra × A\*, viabilidade,
 condições, NSGA-II), com `tokens.css` + `admin.css`.
 
+## 9a. Localização (GPS) e busca de endereço (`local.py`)
+
+Botão **Minha localização** (origem) e campo **Buscar endereço** ("Sair daqui"
+ou "Ir para cá"). A posição **não vira vértice do grafo**: matriz de carro,
+traçados e segurança são pré-calculados por ponto, e inserir pontos arbitrários
+exigiria OSRM ao vivo e dado de segurança que não existe para eles. Ela é ligada
+ao **ponto da rede mais próximo** por caminhada estimada (reta × 1,3, a
+4,8 km/h ou 3 km/h se acessível), que o app soma ao tempo e à chegada de cada
+card, mostra em texto e desenha tracejada no mapa. Acima de 2,5 km, avisa "fora
+da área coberta".
+
+- `GET /api/proximo?lat=&lon=[&acessivel=1]` → 3 pontos mais próximos com km/min.
+- `GET /api/buscar?q=` → até 5 endereços do **Nominatim** (OSM) dentro da caixa
+  da RMR, cada um com o ponto mais próximo. Política do Nominatim: ≤ 1
+  requisição/s (trava + intervalo em `local.py`), User-Agent do app, **sem
+  autocompletar** (só busca ao enviar). Cache em memória por texto.
+- Trocar o ponto na lista remove a posição daquele lado; inverter troca as duas.
+- Geolocalização só funciona em HTTPS ou localhost (a Vercel é HTTPS).
+
 ## 9b. PWA e deploy
 
 **Por que PWA e não React Native:** o mesmo código serve Android e iPhone, sem

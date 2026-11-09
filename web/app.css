@@ -146,6 +146,41 @@ html[data-tema="claro"] .leaflet-control-attribution{background:rgba(255,255,255
 .btn-trocar:hover{background:var(--elev2);color:var(--txt)}
 .btn-trocar svg{width:16px;height:16px}
 
+/* ================== localização e busca ================== */
+.local{display:flex;gap:8px;margin-top:10px;align-items:stretch}
+.chip{
+  flex:none;display:inline-flex;align-items:center;gap:6px;
+  padding:0 12px;height:38px;border-radius:19px;background:var(--elev);
+  color:var(--txt);font-size:13.5px;font-weight:500;white-space:nowrap;
+}
+.chip svg{width:16px;height:16px;color:var(--acento)}
+.chip:hover{background:var(--elev2)}
+.chip[aria-busy="true"]{opacity:.6}
+.procura{flex:1 1 auto;min-width:0;display:flex}
+.procura input{
+  width:100%;min-width:0;height:38px;border-radius:19px;border:0;padding:0 14px;
+  background:var(--elev);color:var(--txt);font:inherit;font-size:14px;
+}
+.procura input::placeholder{color:var(--txt3)}
+.procura input:focus{outline:2px solid var(--acento-bg)}
+.resultados{list-style:none;margin:8px 0 0;padding:4px;border-radius:12px;background:var(--elev)}
+.resultados li{display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:9px}
+.resultados li + li{border-top:1px solid var(--div)}
+.resultados .rt{flex:1 1 auto;min-width:0;font-size:13.5px;line-height:1.35}
+.resultados .rt small{display:block;color:var(--txt3);font-size:12px;margin-top:2px}
+.resultados .acoes{flex:none;display:flex;gap:6px}
+.resultados .acoes button{
+  height:30px;padding:0 10px;border-radius:15px;background:var(--elev2);
+  color:var(--txt);font-size:12.5px;font-weight:500;white-space:nowrap;
+}
+.resultados .acoes button:hover{background:var(--acento-bg)}
+.resultados .vazio{color:var(--txt3);font-size:13px}
+.acesso{margin:10px 2px 0;font-size:12.5px;line-height:1.45;color:var(--txt2)}
+.acesso b{color:var(--txt);font-weight:600}
+.acesso .longe{color:var(--alerta)}
+.acesso button{color:var(--txt3);text-decoration:underline;font-size:12px;margin-left:4px}
+.pin-voce i{width:12px;height:12px;background:var(--acento)!important;border:2px solid #fff}
+
 /* ================== condições ================== */
 .condicoes{
   display:flex;align-items:center;gap:7px;flex-wrap:wrap;

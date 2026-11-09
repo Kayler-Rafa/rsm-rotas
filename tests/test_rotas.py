@@ -408,6 +408,26 @@ class TestRiscoNoturno(unittest.TestCase):
                                          (u, ar.destino))
 
 
+class TestLocalizacao(unittest.TestCase):
+    """GPS / endereco: liga a posicao ao ponto da rede mais proximo."""
+
+    def test_ponto_mais_proximo_e_caminhada(self):
+        import local
+        r = local.proximos(-8.0631, -34.8711)          # ao lado do Marco Zero
+        self.assertEqual(r["pontos"][0]["id"], "recife_antigo")
+        self.assertLess(r["pontos"][0]["km"], 0.2)
+        self.assertFalse(r["longe"])
+        kms = [p["km"] for p in r["pontos"]]
+        self.assertEqual(kms, sorted(kms))
+        # caminhada = reta x rodeio, na velocidade a pe (mais lenta se acessivel)
+        acess = local.proximos(-8.0631, -34.8711, acessivel=True)["pontos"][0]["min"]
+        self.assertGreater(acess, r["pontos"][0]["min"])
+
+    def test_longe_da_rede_e_avisado(self):
+        import local
+        self.assertTrue(local.proximos(-8.20, -35.05)["longe"])   # interior de Jaboatao
+
+
 class TestContramao(unittest.TestCase):
     """Aviso de bicicleta na contramao: so onde a rota de fato pula um contorno."""
 

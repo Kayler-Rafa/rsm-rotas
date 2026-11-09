@@ -56,7 +56,8 @@ function chegada(horaLocal, minutos){
 /* =========================================================
    2. Estado e API
    ========================================================= */
-const estado = { rede:null, dados:null, selecionada:0, recarga:{}, acessivel:false };
+const estado = { rede:null, dados:null, selecionada:0, recarga:{}, acessivel:false,
+                 local:{ o:null, d:null } };
 const $ = id => document.getElementById(id);
 
 function carregando(l){ $("carregando").hidden = !l; }
@@ -155,6 +156,7 @@ function renderOpcoes(){
 
     const alerta = (r.avisos || []).find(a => a.nivel === "alerta");
     const trocas = v.transferencias;
+    const total = v.tempo + minutosAcesso();
 
     let html = `
       <button class="opcao-linha" type="button" aria-pressed="${sel}">
@@ -162,8 +164,8 @@ function renderOpcoes(){
         <span class="meio">
           <span class="l1"><span class="nome">${esc(r.resumo)}</span><span class="preco">${brl(v.custo)}</span></span>
           <span class="l2">
-            <span class="dur">${minutosTxt(v.tempo)}</span>
-            <span class="chega">chega às ${chegada(hora, v.tempo)} · ${trocas} ${trocas === 1 ? "troca" : "trocas"}</span>
+            <span class="dur">${minutosTxt(total)}</span>
+            <span class="chega">chega às ${chegada(hora, total)} · ${trocas} ${trocas === 1 ? "troca" : "trocas"}</span>
             <span class="impacto">${impactoTxt(v)}</span>
           </span>
           <span class="barra">${barra}</span>
@@ -333,7 +335,19 @@ function desenhar(ajustar){
     L.circleMarker([e.lat, e.lon], { radius:6, color:corDe("carro"), weight:1.5, opacity:.55, dashArray:"2 3", fillOpacity:0 })
       .addTo(camada).bindTooltip(e.nome));
 
+  // posicao real (GPS ou endereco) ligada ao ponto da rede por caminhada
+  const extras = [];
+  ["o", "d"].forEach(k => {
+    const l = estado.local[k];
+    if (!l) return;
+    const p = [l.ponto.lat, l.ponto.lon], aqui = [l.lat, l.lon];
+    L.polyline(k === "o" ? [aqui, p] : [p, aqui], { color:corDe("pe"), weight:4, opacity:.9, dashArray:"2 8", lineCap:"round" }).addTo(camada);
+    pin(aqui, "pin-voce").addTo(camada).bindTooltip(l.nome);
+    extras.push(aqui);
+  });
+
   if (pontos.length) {
+    extras.forEach(p => pontos.push(p));
     pin(pontos[0], "pin-o").addTo(camada);
     pin(pontos[pontos.length - 1], "pin-d").addTo(camada);
     if (ajustar !== false) mapa.fitBounds(L.latLngBounds(pontos), padding());
@@ -354,7 +368,7 @@ function movel(){ return !window.matchMedia("(min-width:860px)").matches; }
 
 function comecar(ev){
   if (!movel()) return;
-  if (ev.target.closest("select, button") && !ev.target.closest(".pega")) return;
+  if (ev.target.closest("select, button, input") && !ev.target.closest(".pega")) return;
   if (ev.target.closest(".folha-rolagem") && snap === ALTO && rolagem.scrollTop > 0) return;
   arrastando = true; y0 = ev.clientY; base = snap;
   folha.classList.add("arrastando");
@@ -449,11 +463,100 @@ document.addEventListener("visibilitychange", () => {
 $("btnTrocar").addEventListener("click", () => {
   const o = $("selOrigem"), d = $("selDestino");
   const t = o.value; o.value = d.value; d.value = t;
+  const l = estado.local; [l.o, l.d] = [l.d, l.o];
+  renderAcesso();
   buscar();
+});
+
+/* =========================================================
+   8b. Onde voce esta: GPS e busca de endereco (local.py)
+   A posicao nao vira vertice do grafo: liga-se ao ponto da rede mais proximo
+   por uma caminhada estimada, somada ao tempo dos cards e desenhada no mapa.
+   ========================================================= */
+function velPe(){ return estado.acessivel ? 3.0 : 4.8; }
+function minutosAcesso(){
+  return ["o", "d"].reduce((s, k) => s + (estado.local[k] ? estado.local[k].ponto.km / velPe() * 60 : 0), 0);
+}
+const metros = k => k < 1 ? Math.round(k * 100) * 10 + " m" : km(k);
+
+function renderAcesso(){
+  const partes = [];
+  ["o", "d"].forEach(k => {
+    const l = estado.local[k];
+    if (!l) return;
+    const min = Math.max(1, Math.round(l.ponto.km / velPe() * 60));
+    const txt = k === "o"
+      ? `A pé de <b>${esc(l.nome)}</b> até ${esc(l.ponto.nome)}: ${metros(l.ponto.km)}, ${min} min`
+      : `A pé de ${esc(l.ponto.nome)} até <b>${esc(l.nome)}</b>: ${metros(l.ponto.km)}, ${min} min`;
+    const longe = l.longe ? ' <span class="longe">Fora da área coberta pela rede: o ponto mais próximo está longe.</span>' : "";
+    partes.push(`${txt}${longe}<button type="button" data-limpar="${k}">remover</button>`);
+  });
+  $("acesso").innerHTML = partes.length ? partes.join("<br>") + "<br><span>Já somado ao tempo de cada opção.</span>" : "";
+  $("acesso").hidden = !partes.length;
+}
+function avisoAcesso(txt){ $("acesso").hidden = false; $("acesso").textContent = txt; }
+$("acesso").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-limpar]");
+  if (!b) return;
+  estado.local[b.dataset.limpar] = null;
+  renderAcesso();
+  if (estado.dados && estado.dados.cards) { renderOpcoes(); desenhar(true); }
+});
+
+function usarLocal(lado, l){
+  estado.local[lado] = l;
+  const sel = lado === "o" ? $("selOrigem") : $("selDestino");
+  sel.value = l.ponto.id;
+  $("resultados").hidden = true;
+  renderAcesso();
+  buscar(false);
+}
+
+$("btnGps").addEventListener("click", () => {
+  const b = $("btnGps");
+  if (!navigator.geolocation) { avisoAcesso("Este navegador não informa a localização."); return; }
+  b.setAttribute("aria-busy", "true");
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude, lon = pos.coords.longitude;
+    api(`/api/proximo?lat=${lat}&lon=${lon}`).then(r => {
+      usarLocal("o", { lat, lon, nome:"Você", ponto:r.pontos[0], longe:r.longe });
+    }).catch(e => avisoAcesso(e.message))
+      .finally(() => b.removeAttribute("aria-busy"));
+  }, err => {
+    b.removeAttribute("aria-busy");
+    avisoAcesso(err.code === 1
+      ? "Permissão de localização negada. Escolha a origem na lista ou busque um endereço."
+      : "Não foi possível obter a localização agora.");
+  }, { enableHighAccuracy:true, timeout:12000, maximumAge:60000 });
+});
+
+let resultadosBusca = [];
+$("formBusca").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const q = $("inpBusca").value.trim();
+  const ul = $("resultados");
+  if (q.length < 3) { ul.hidden = true; return; }
+  ul.hidden = false; ul.innerHTML = '<li class="vazio">Buscando…</li>';
+  api(`/api/buscar?q=${encodeURIComponent(q)}`).then(r => {
+    resultadosBusca = (r.resultados || []).filter(x => x.ponto);
+    if (!resultadosBusca.length) { ul.innerHTML = '<li class="vazio">Nada encontrado na Região Metropolitana do Recife.</li>'; return; }
+    ul.innerHTML = resultadosBusca.map((x, i) => `<li>
+        <span class="rt">${esc(x.nome)}<small>perto de ${esc(x.ponto.nome)} · ${metros(x.ponto.km)}${x.longe ? " · fora da área coberta" : ""}</small></span>
+        <span class="acoes"><button type="button" data-res="${i}" data-lado="o">Sair daqui</button><button type="button" data-res="${i}" data-lado="d">Ir para cá</button></span>
+      </li>`).join("");
+  }).catch(e => { ul.innerHTML = `<li class="vazio">${esc(e.message)}</li>`; });
+});
+$("resultados").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-res]");
+  if (!b) return;
+  const x = resultadosBusca[Number(b.dataset.res)];
+  usarLocal(b.dataset.lado, { lat:x.lat, lon:x.lon, nome:x.nome.split(",")[0], ponto:x.ponto, longe:x.longe });
+  $("inpBusca").value = "";
 });
 $("btnAcessivel").addEventListener("click", e => {
   estado.acessivel = !estado.acessivel;
   e.currentTarget.setAttribute("aria-pressed", String(estado.acessivel));
+  renderAcesso();
   buscar();                 // a acessibilidade muda o grafo: recalcula no servidor
 });
 $("cta").addEventListener("click", () => {
@@ -468,8 +571,8 @@ api("/api/rede").then(rede => {
   const o = $("selOrigem"), d = $("selDestino");
   rede.pontos.forEach(p => { o.add(new Option(p.nome, p.id)); d.add(new Option(p.nome, p.id)); });
   o.value = rede.origem_padrao; d.value = rede.destino_padrao;
-  o.addEventListener("change", () => buscar(false));
-  d.addEventListener("change", () => buscar(false));
+  o.addEventListener("change", () => { estado.local.o = null; renderAcesso(); buscar(false); });
+  d.addEventListener("change", () => { estado.local.d = null; renderAcesso(); buscar(false); });
   buscar(false);
 }).catch(e => {
   $("opcoes").innerHTML = `<li class="erro">Não foi possível carregar a rede: ${esc(e.message)}</li>`;

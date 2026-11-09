@@ -48,6 +48,18 @@
         </button>
       </div>
 
+      <div class="local">
+        <button class="chip" id="btnGps" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>
+          <span>Minha localização</span>
+        </button>
+        <form class="procura" id="formBusca" role="search">
+          <input id="inpBusca" type="search" placeholder="Buscar endereço" autocomplete="off" enterkeyhint="search" aria-label="Buscar endereço na Região Metropolitana do Recife">
+        </form>
+      </div>
+      <ul class="resultados" id="resultados" hidden></ul>
+      <p class="acesso" id="acesso" hidden></p>
+
       <div class="condicoes" id="condicoes"></div>
 
       <div class="cabeca">
