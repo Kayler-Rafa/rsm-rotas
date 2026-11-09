@@ -205,7 +205,7 @@ rotas/
 │   ├── motor.py       consulta, rota, cards do app e análise de viabilidade
 │   └── server.py      servidor HTTP (biblioteca padrão)
 ├── tests/
-│   └── test_rotas.py  18 testes de corretude das rotas, dos algoritmos e da segurança
+│   └── test_rotas.py  20 testes de corretude das rotas, dos algoritmos e da segurança
 ├── dados/
 │   ├── matriz_carro.json   distância e tempo de carro entre os 30 pontos (OSRM)
 │   ├── geometria.json      traçados reais (OSRM)
@@ -308,8 +308,8 @@ Sem isso o Dijkstra encerrava no nó do carro e a rota nunca pagava o desembarqu
 | bicicleta (própria) | 14,0 | — | 0 | — |
 | bicicleta elétrica compartilhada | 18,0 | R$ 0,55/**min** + R$ 1,00 desbloqueio | 0,83 | sim |
 | patinete compartilhado | 16,0 | R$ 0,65/**min** + R$ 1,00 desbloqueio | 1,25 | sim |
-| metrô/VLT | 32,0 | R$ 4,10 (tarifa) | 3,70 | sim |
-| ônibus | 18,0 | R$ 4,10 (tarifa) | 68,00 | **não** |
+| metrô/VLT | 32,0 | R$ 4,25 (tarifa CBTU) | 3,70 | sim |
+| ônibus | 18,0 | R$ 4,50 (Bilhete Único) | 68,00 | **não** |
 | carro elétrico (próprio) | via real ¹ | R$ 0,25/km + R$ 8,00 estacionamento | 12,45 | sim |
 | carro elétrico de aplicativo | via real ¹ | R$ 1,90/km + R$ 6,00 bandeirada | 12,45 | sim |
 
@@ -363,7 +363,7 @@ substantiva:
    mostra por quê: a Linha Sul começa na Estação Recife e Olinda não é servida
    por trilho, então a perna a pé passa de 10 km. O par que funciona é
    **ônibus/bicicleta + metrô**, e é o que o perfil "menor custo" recomenda —
-   R$ 4,10 na integração VEM.
+   uma tarifa só na integração VEM (R$ 4,10 na época; hoje R$ 4,25 a R$ 4,50).
 
 5. **A heurística do A\* precisou mudar de limite.** A Etapa 2 dividia a
    distância em linha reta pela maior velocidade *nominal* da rede (metrô,
@@ -412,8 +412,9 @@ Estes números são **estimativa**, não medição:
   inclui depreciação, seguro nem IPVA. O do carro de aplicativo não modela
   tarifa dinâmica nem deslocamento em vazio, e a frota elétrica de aplicativo na
   RMR ainda é pequena — a disponibilidade assumida é otimista.
-- A tarifa de R$ 4,10 do anel A é herdada da Etapa 1 e deve ser reverificada
-  junto ao Grande Recife antes de qualquer uso real.
+- Tarifas verificadas em nov/2026: ônibus R$ 4,50 (Bilhete Único do Grande
+  Recife, desde 01/02/2026). O metrô usa R$ 4,25, última referência pública
+  (jan/2025); sem reajuste de 2026 encontrado, reverificar na CBTU.
 - Os 30 pontos têm coordenada do OpenStreetMap, mas continuam sendo um
   **recorte** da rede: não há parada de ônibus em todos (no Marco Zero, por
   exemplo, não há — e por isso, com mobilidade reduzida, o transporte público não

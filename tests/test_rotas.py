@@ -327,5 +327,36 @@ class TestSeguranca(unittest.TestCase):
         self.assertFalse(self.seg.inseguro_para("se_olinda", "carmo", "pe"))
 
 
+class TestTransportePublico(unittest.TestCase):
+    """O card de transporte publico e o onibus nos dois sentidos."""
+
+    def test_card_transporte_publico_so_usa_coletivo_e_e_o_mais_rapido(self):
+        for o, d in PARES:
+            r = motor.opcoes_de_viagem(o, d)
+            cards = [c for c in r["cards"] if "transporte_publico" in c["perfis_id"]]
+            self.assertEqual(len(cards), 1, "%s->%s sem card de transporte publico" % (o, d))
+            c = cards[0]
+            self.assertTrue(set(c["modos"]) <= {"pe", "onibus", "metro"}, c["modos"])
+            self.assertTrue(set(c["modos"]) & {"onibus", "metro"}, c["modos"])
+            # e a mais rapida entre todas as rotas so de coletivo (Dijkstra exato)
+            ref = motor.consultar(o, d, Opcoes(modos=frozenset({"pe", "onibus", "metro"}),
+                                               clima=r["condicoes"]["clima"]["clima"],
+                                               transito=r["condicoes"]["transito"]["transito"]),
+                                  "mais_rapida", com_pareto=False)
+            self.assertIn("dijkstra", ref)
+            self.assertLessEqual(float(c["tempo"]),
+                                 float(ref["dijkstra"]["rota"]["tempo"]) + 0.11)
+
+    def test_onibus_leva_o_mesmo_tempo_nos_dois_sentidos(self):
+        """Os pontos de rua estao na pista sentido sul; a volta nao pode pagar
+        um retorno em cada ponto (era 119 min contra 62 na ida)."""
+        op = Opcoes(modos=frozenset({"pe", "onibus"}))
+        ida = motor.consultar("se_olinda", "igreja_piedade", op, "mais_rapida", com_pareto=False)
+        volta = motor.consultar("igreja_piedade", "se_olinda", op, "mais_rapida", com_pareto=False)
+        ti = float(ida["dijkstra"]["rota"]["tempo"])
+        tv = float(volta["dijkstra"]["rota"]["tempo"])
+        self.assertLess(abs(ti - tv) / min(ti, tv), 0.10, "ida %.1f x volta %.1f" % (ti, tv))
+
+
 if __name__ == "__main__":
     unittest.main()

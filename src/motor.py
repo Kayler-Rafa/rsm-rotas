@@ -711,11 +711,23 @@ def _seguranca_da_rota(rota: Dict[str, object]) -> Dict[str, object]:
     }
 
 
+# Card fora dos perfis de TOPSIS: a melhor viagem SO de transporte publico.
+PERFIL_TRANSPORTE_PUBLICO = "transporte_publico"
+ROTULO_TRANSPORTE_PUBLICO = "Transporte público"
+MODOS_TRANSPORTE_PUBLICO = frozenset({"pe", "onibus", "metro"})
+
+
+def _rotulo_perfil(perfil_id: str) -> str:
+    if perfil_id == PERFIL_TRANSPORTE_PUBLICO:
+        return ROTULO_TRANSPORTE_PUBLICO
+    return str(PERFIS[perfil_id]["rotulo"])
+
+
 def _card(perfil_id: str, rota: Dict[str, object],
           cond: Dict[str, object]) -> Dict[str, object]:
     return {
         "perfil": perfil_id,
-        "rotulo": PERFIS[perfil_id]["rotulo"],
+        "rotulo": _rotulo_perfil(perfil_id),
         "resumo": _resumo_modal(rota),
         "tempo": rota["tempo"],
         "custo": rota["custo"],
@@ -947,6 +959,39 @@ def _variante_recarga(origem_id: str, destino_id: str, op: Opcoes,
     return _card("mais_rapida", rota, cond)
 
 
+def _transporte_publico(origem_id: str, destino_id: str, op: Opcoes,
+                        cond: Dict[str, object]) -> Optional[Dict[str, object]]:
+    """A viagem mais rapida usando so onibus, metro e caminhada.
+
+    Com todos os modais, o transporte publico nunca e o extremo de nenhum
+    objetivo: o carro ganha tempo e esforco, a bicicleta ganha custo e emissao,
+    e a bicicleta + metro ocupa o lugar dele na fronteira. Mas e a opcao que
+    quem nao tem carro nem quer pedalar 20 km de fato usa, e o app de rotas
+    SUSTENTAVEIS nao pode escondê-la. Por isso ela e calculada a parte, num
+    grafo so com esses modais, por Dijkstra lexicografico (tempo, depois custo,
+    emissao, esforco) - exato, nao heuristico.
+
+    Devolve None se nao existir rota, ou se a melhor for so a pe (nesse caso
+    nao e "transporte publico", e a caminhada ja aparece em outro card).
+    """
+    op_tp = Opcoes(modos=MODOS_TRANSPORTE_PUBLICO, clima=op.clima,
+                   transito=op.transito, acessivel=op.acessivel,
+                   evitar_inseguros=op.evitar_inseguros)
+    g = construir_grafo(op_tp, origem_id, destino_id)
+    origem: No = (origem_id, "pe", 0, 0)
+    destinos = nos_destino(g, destino_id)
+    if origem not in g.adj or not destinos:
+        return None
+    dist, pred, _ = alg.dijkstra(g, origem, destinos, PESOS_TEMPO_LEXICOGRAFICO)
+    alvo = alg.melhor_destino(dist, destinos)
+    if alvo is None:
+        return None
+    rota = descrever_rota(g, alg.reconstruir(pred, alvo))
+    if not set(rota["modos"]) & {"onibus", "metro"}:   # type: ignore[arg-type]
+        return None
+    return _card(PERFIL_TRANSPORTE_PUBLICO, rota, cond)
+
+
 def opcoes_de_viagem(origem_id: str, destino_id: str,
                      acessivel: bool = False,
                      normalizacao: str = "minmax",
@@ -996,6 +1041,10 @@ def opcoes_de_viagem(origem_id: str, destino_id: str,
     # de carregar 50 min no eletroposto lento e seguir de metro e a pe: +83 min,
     # e outra viagem. Agora a variante e so carro (e a caminhada de desembarque),
     # e a parada escolhida e a que MENOS atrasa - empate desfeito pelo custo.
+    tp = _transporte_publico(origem_id, destino_id, op, cond)
+    if tp is not None:
+        por_perfil[PERFIL_TRANSPORTE_PUBLICO] = tp
+
     if any(x["usa_carro"] for x in por_perfil.values()):
         variante = _variante_recarga(origem_id, destino_id, op, cond)
         if variante is not None:
@@ -1008,7 +1057,7 @@ def opcoes_de_viagem(origem_id: str, destino_id: str,
     # Mostrar tres cards identicos seria ruido; o card vira a rota, e as
     # prioridades que ela atende viram etiquetas dentro dele.
     ordem = ["mais_rapida", "menor_custo", "menor_emissao", "menos_esforco",
-             "equilibrada"]
+             "equilibrada", PERFIL_TRANSPORTE_PUBLICO]
     cards: List[Dict[str, object]] = []
     indice: Dict[str, Dict[str, object]] = {}
     for pid in ordem:
@@ -1024,7 +1073,7 @@ def opcoes_de_viagem(origem_id: str, destino_id: str,
             indice[chave] = card
             cards.append(card)
         else:
-            existente["perfis"].append(PERFIS[pid]["rotulo"])   # type: ignore[union-attr]
+            existente["perfis"].append(_rotulo_perfil(pid))     # type: ignore[union-attr]
             existente["perfis_id"].append(pid)                  # type: ignore[union-attr]
 
     # a variante com recarga segue o perfil primario do card mesclado

@@ -38,9 +38,17 @@ FATOR_CARRO_G_KM = 155.0
 G_POR_KWH = 83.0
 KWH_POR_KM_CARRO = 0.15
 
-# Tarifa do Sistema Estrutural Integrado, anel A, herdada da Etapa 1.
-# Valor a reverificar junto ao Grande Recife antes de qualquer uso real.
-TARIFA_SEI = 4.10
+# Tarifas (verificadas em 2026-11-09).
+# Onibus: Bilhete Unico do Grande Recife (antigo anel A), R$ 4,50 desde
+#   01/02/2026 (reajuste de 4,46% aprovado pelo CSTM; Arpe arredondou 4,47 -> 4,50).
+#   A Etapa 1 usava R$ 4,10.
+# Metro: CBTU Recife, R$ 4,25 - ultima referencia publica e de jan/2025, sem
+#   reajuste de 2026 encontrado. Reverificar no gov.br/cbtu.
+# A troca direta onibus <-> metro continua isenta (integracao VEM, ver
+# MODOS_INTEGRADOS).
+TARIFA_ONIBUS = 4.50
+TARIFA_METRO = 4.25
+TARIFA_SEI = TARIFA_ONIBUS     # nome antigo, mantido para a API (/api/rede)
 
 # Estacionamento do carro proprio, cobrado ao deixar o veiculo. Sem isso a
 # comparacao e enviesada: o carro aparece custando so a energia (~R$ 6) contra
@@ -96,14 +104,14 @@ MODOS: Dict[str, Modo] = {
         "(2-3 km). Cobranca por minuto e regulamentacao restrita ao Recife."),
 
     "metro": Modo(
-        "metro", 32.0, 0.00, 0.00, TARIFA_SEI, 3.70, 0.20,
+        "metro", 32.0, 0.00, 0.00, TARIFA_METRO, 3.70, 0.20,
         True, False, False, "metrô", "#dc2626",
         "Viavel com validacao local. Tracao eletrica documentada (CBTU). E o "
         "modo de maior velocidade comercial da rede e o par natural da "
         "caminhada neste corredor."),
 
     "onibus": Modo(
-        "onibus", 18.0, 0.00, 0.00, TARIFA_SEI, 68.00, 0.30,
+        "onibus", 18.0, 0.00, 0.00, TARIFA_ONIBUS, 68.00, 0.30,
         False, False, False, "ônibus", "#d97706",
         "Viavel no MVP. NAO ha frota eletrica em operacao na RMR: o modo e "
         "modelado como diesel, com 68 g CO2eq/km, e e a unica fonte relevante "
@@ -536,6 +544,24 @@ def haversine_km(a: Ponto, b: Ponto) -> float:
     return 2 * r * math.asin(math.sqrt(h))
 
 
+def onibus_osrm(u: str, v: str) -> Optional[Tuple[float, float]]:
+    """(km, min em fluxo livre) do onibus entre dois pontos do corredor.
+
+    O MENOR dos dois sentidos do OSRM, nao o sentido u->v. Os pontos de rua
+    foram tirados das manobras da rota real Se -> Piedade, entao ficam na pista
+    que vai para o sul. No sentido contrario o OSRM tem de fazer retorno em
+    cada ponto (Ponte Paulo Guerra -> Pina: 0,26 km na ida, 3,48 km na volta),
+    e a soma trecho a trecho deixava o onibus Piedade -> Se com 119 min contra
+    62 na ida. O onibus de volta roda na pista paralela, de extensao parecida.
+    O carro nao tem esse problema porque usa a rota direta (aresta-atalho).
+    """
+    import geometria                       # tardio: quebra o ciclo de import
+    candidatos = [x for x in (geometria.carro(u, v), geometria.carro(v, u)) if x]
+    if not candidatos:
+        return None
+    return min(candidatos, key=lambda x: x[1])
+
+
 def distancia_trecho(t: Trecho, modo: Optional[str] = None) -> float:
     """Extensao do trecho para aquele modal.
 
@@ -561,8 +587,10 @@ def distancia_trecho(t: Trecho, modo: Optional[str] = None) -> float:
             return float(item["dist_km"])  # type: ignore[arg-type]
     ida = geometria.carro(t.u, t.v)
     volta = geometria.carro(t.v, t.u)
-    if modo == "onibus" and ida:
-        return ida[0]
+    if modo == "onibus":
+        sentido = onibus_osrm(t.u, t.v)
+        if sentido:
+            return sentido[0]
     candidatos = [x[0] for x in (ida, volta) if x]
     if candidatos:
         menor = min(candidatos)
@@ -630,8 +658,7 @@ def custo_deslocamento(t: Trecho, modo: str, cen: Cenario,
 
     tempo = None
     if modo == "onibus":
-        import geometria
-        osrm = geometria.carro(t.u, t.v)
+        osrm = onibus_osrm(t.u, t.v)
         if osrm:
             tempo = (osrm[1] * FATOR_CONGESTIONAMENTO * FATOR_PARADAS_ONIBUS
                      * cen.fator_tempo_motorizado)

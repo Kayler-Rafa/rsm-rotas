@@ -9,7 +9,7 @@ deploy; ver §9b).
 
 ```bash
 python src/server.py                          # app em http://localhost:8000, técnico em /admin
-python -m unittest discover -s tests -v       # 18 testes de corretude (~2 min)
+python -m unittest discover -s tests -v       # 20 testes de corretude (~2 min)
 python src/geometria.py                       # rebaixa matriz e traçados do OSRM (rede mudou)
 python src/seguranca.py                       # rebaixa sinistros da CTTU e comprimentos do OSM
 python src/rede_rsm.py                        # |V|, |E| e custo por modal
@@ -125,7 +125,7 @@ Regras estruturais (todas testadas):
 | Modal | Distância | Tempo |
 |---|---|---|
 | **carro, carro de app** | OSRM, via real | OSRM em fluxo livre **× 1,647** × trânsito |
-| **ônibus** | OSRM entre pontos consecutivos do corredor | OSRM × 1,647 **× 1,35** (paradas) × trânsito |
+| **ônibus** | OSRM entre pontos consecutivos do corredor, **menor dos dois sentidos** | OSRM × 1,647 **× 1,35** (paradas) × trânsito |
 | **a pé, bicicletas** | rota real a pé / de bicicleta, **sem mão única** (FOSSGIS; ver abaixo) | distância ÷ velocidade do modal |
 | **metrô** | linha reta × 1,05 | ÷ 32 km/h |
 
@@ -177,6 +177,14 @@ agora estão sobre as vias certas (o OSRM não precisa "encaixar" com desvio), e
 carro não soma mais trechos — usa a rota direta.
 
 ---
+
+**Ônibus usa o menor dos dois sentidos** (`rede_rsm.onibus_osrm`). Os pontos de
+rua vêm das manobras da rota Sé → Piedade e ficam na pista sentido sul. No
+sentido contrário o OSRM faz retorno em cada ponto (Ponte Paulo Guerra → Pina:
+0,26 km na ida, 3,48 km na volta), e o ônibus Piedade → Sé dava 134 min contra
+77 na ida. O ônibus de volta roda na pista paralela; tempo, distância e desenho
+(`geometria.polilinha`) usam o sentido mais curto. O carro não tem o problema:
+é aresta-atalho direta.
 
 ## 4. Condições automáticas (`clima.py`)
 
@@ -315,7 +323,13 @@ estimado por horário e só muda na virada de faixa.
    recarga obrigatória, Dijkstra lexicográfico (tempo, depois o resto). Promete
    "a mesma viagem com uma parada"; o teste
    `test_variante_recarga_e_a_mesma_viagem_de_carro` garante que não vira outra.
-5. Traçado real buscado ao vivo **só para os cards**, no máximo 6 por consulta
+5. **Card "Transporte público"** (`motor._transporte_publico`, 2026-11-09):
+   grafo só `{pe, onibus, metro}`, Dijkstra lexicográfico (tempo, depois o
+   resto). Com todos os modais o coletivo nunca é extremo de nenhum objetivo
+   (carro ganha tempo/esforço, bicicleta ganha custo/emissão), mas um app de
+   rotas sustentáveis não pode escondê-lo. Fica fora de `PERFIS` (não entra no
+   TOPSIS nem no `/admin`). Some se a melhor rota coletiva for só a pé.
+6. Traçado real buscado ao vivo **só para os cards**, no máximo 6 por consulta
    (`MAX_TRACADOS_AO_VIVO`), gravado no cache.
 
 Resultado atual Sé → Piedade, tempo bom, trânsito normal:
@@ -324,7 +338,8 @@ Resultado atual Sé → Piedade, tempo bom, trânsito normal:
 |---|---|---|---|
 | Carro elétrico | 53 min | R$ 13,59 | recomendado, equilibrada |
 | Carro de app | 52 min | R$ 48,52 | mais rápida, menos esforço |
-| Bicicleta | 1 h 38 | R$ 0,00 | menor custo, menor emissão |
+| Ônibus | 1 h 17 | R$ 4,50 | transporte público |
+| Bicicleta | 1 h 36 | R$ 0,00 | menor custo, menor emissão |
 
 Recarga no card do carro: **+25 min, +R$ 26,00** (Eletroposto Visconde de
 Jequitinhonha, rápido, sobre a rota — o acréscimo é só a carga, sem desvio).
@@ -357,7 +372,7 @@ Jequitinhonha, rápido, sobre a rota — o acréscimo é só a carga, sem desvio
 
 ## 7. Testes (`tests/test_rotas.py`)
 
-18 testes, stdlib `unittest`, ~2 min. Cada um verifica uma **propriedade** que tem
+20 testes, stdlib `unittest`, ~2 min. Cada um verifica uma **propriedade** que tem
 de valer, não um número copiado da saída:
 
 | Teste | Garante |
@@ -380,6 +395,8 @@ de valer, não um número copiado da saída:
 | `test_caso_real_dantas_barreto` | Imbiribeira → Recife Antigo avisa a Dantas Barreto |
 | `test_bike_e_pedestre_nao_contornam_mao_unica` | Pina ↔ Ponte PG < 0,5 km a pé e de bike; nenhum trecho de bike maior que o carro |
 | `test_sem_dado_nao_e_seguro` | trecho em Olinda = "sem dado", nunca "ok" |
+| `test_card_transporte_publico_so_usa_coletivo_e_e_o_mais_rapido` | card existe nos 6 pares, só pe/ônibus/metrô, e é a mais rápida dessas |
+| `test_onibus_leva_o_mesmo_tempo_nos_dois_sentidos` | Sé ⇄ Piedade de ônibus com < 10% de diferença |
 
 Varredura completa feita uma vez (não está na suíte por tempo): **870 pares ×
 3 trânsitos, A\* = Dijkstra em todos; Martins contém o ótimo em 60 pares × 4
@@ -478,14 +495,13 @@ Capacitor), não reescreva.
   rede, não erro de algoritmo.
 - **Ônibus é corredor contínuo** Olinda–Piedade. Sem GTFS não dá para saber quais
   linhas existem; na prática exige baldeação.
-- **Transporte público nunca ganha card** neste par com todos os modais: carro
-  ganha tempo/esforço, bicicleta ganha custo/emissão. O arranjo
-  ônibus/bicicleta + metrô está na fronteira (visível no `/admin`) mas não é
-  extremo de nenhum objetivo. Decisão de produto em aberto.
+- ~~Transporte público nunca ganha card~~ — resolvido com o card próprio (§5).
 - Eletropostos e acessibilidade são *proxies*. O índice de segurança por modal
   (`seguranca` na API, usado no custo de desconforto) também é *proxy*. O
   **filtro** de vias perigosas usa dado real (seção 4b).
-- Tarifa de R$ 4,10 herdada da Etapa 1, a reverificar.
+- Tarifas atualizadas em 2026-11-09: ônibus R$ 4,50 (Bilhete Único, desde
+  01/02/2026, confirmada); metrô R$ 4,25 (CBTU, referência de jan/2025, **a
+  reverificar**). A troca ônibus ⇄ metrô segue isenta (integração VEM).
 - Autonomia do carro elétrico não é modelada.
 - Rotas a pé e de bike vêm do FOSSGIS, que exclui `trunk`. Onde a rota de carro
   foi usada no lugar, o traçado pode incluir um trecho de mão única que o

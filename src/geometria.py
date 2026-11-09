@@ -103,6 +103,13 @@ def polilinha(u: str, v: str, fallback: List[List[float]],
     if perfil is None:                        # metro: trilho, sem via
         return fallback
     item, invertido = _buscar_cache(u, v, perfil)
+    if modo == "onibus":
+        # mesmo criterio do tempo (rede_rsm.onibus_osrm): o sentido mais curto,
+        # para o desenho nao mostrar os retornos que o onibus nao faz
+        dados = carregar()
+        ida, volta = dados.get(_chave(u, v, "driving")), dados.get(_chave(v, u, "driving"))
+        if ida and volta and float(volta["dist_km"]) < float(ida["dist_km"]):  # type: ignore[arg-type]
+            item, invertido = volta, True
     if not item:
         return list(fallback)
     coords = item["coords"]                   # type: ignore[assignment]
