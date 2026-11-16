@@ -57,7 +57,32 @@ function chegada(horaLocal, minutos){
    2. Estado e API
    ========================================================= */
 const estado = { rede:null, dados:null, selecionada:0, recarga:{}, acessivel:false,
-                 local:{ o:null, d:null } };
+                 local:{ o:null, d:null },
+                 bateria:"",      // carga do carro eletrico em %, "" = nao informada
+                 simular:{} };    // clima/transito/turno vindos da URL (demonstracao)
+
+/* O endereco da pagina guarda a consulta: recarregar ou mandar o link para
+   alguem abre a mesma viagem. A posicao do GPS nao vai no link. */
+const SIMULAVEIS = { clima:["bom","chuva_leve","chuva_forte"],
+                     transito:["livre","normal","congestionado"], turno:["dia","noite"] };
+const urlInicial = new URLSearchParams(location.search);
+Object.keys(SIMULAVEIS).forEach(k => {
+  const v = urlInicial.get(k);
+  if (SIMULAVEIS[k].includes(v)) estado.simular[k] = v;
+});
+function consulta(){
+  const p = new URLSearchParams();
+  if (estado.acessivel) p.set("acessivel", "1");
+  if (estado.bateria) p.set("bateria", estado.bateria);
+  Object.keys(estado.simular).forEach(k => p.set(k, estado.simular[k]));
+  return p;
+}
+function linkDaViagem(){
+  const p = consulta();
+  const q = new URLSearchParams({ de:$("selOrigem").value, para:$("selDestino").value });
+  p.forEach((v, k) => q.set(k, v));
+  return location.pathname + "?" + q.toString();
+}
 const $ = id => document.getElementById(id);
 
 function carregando(l){ $("carregando").hidden = !l; }
@@ -93,7 +118,10 @@ const TXT_TRAN  = { livre:"trânsito livre", normal:"trânsito normal", congesti
 function renderCondicoes(){
   const { clima, transito } = estado.dados.condicoes;
   let c;
-  if (clima.disponivel){
+  if (clima.simulado){
+    c = `<span class="c" title="Condição escolhida pelo endereço da página, para demonstração. Não é a medição do momento.">
+           <i class="pt pt-s-sim"></i>${TXT_CLIMA[clima.clima]} <b>simulado</b></span>`;
+  } else if (clima.disponivel){
     const hora = (clima.medido_em || "").slice(11);
     c = `<span class="c" title="${esc(clima.descricao)} · ${esc(clima.fonte)} · medido às ${esc(hora)}">
            <i class="pt pt-m"></i>${TXT_CLIMA[clima.clima]}, ${Math.round(clima.temperatura)}° <b>medido</b></span>`;
@@ -103,10 +131,12 @@ function renderCondicoes(){
   }
   $("condicoes").innerHTML = c +
     `<span class="c" title="${esc(transito.fonte)} · ${esc(transito.motivo)} · ${esc(transito.hora_local)}">
-       <i class="pt pt-e"></i>${cap(TXT_TRAN[transito.transito])} <b>estimado</b></span>` +
+       <i class="pt ${transito.simulado ? "pt-s-sim" : "pt-e"}"></i>${cap(TXT_TRAN[transito.transito])} <b>${transito.simulado ? "simulado" : "estimado"}</b></span>` +
     (transito.turno === "noite"
-      ? `<span class="c" title="Das 18h às 6h, ruas que concentram sinistros noturnos (CTTU) ficam mais restritas para quem anda ou pedala"><i class="pt pt-m"></i>Noite: <b>risco noturno</b></span>`
+      ? `<span class="c" title="Das 18h às 6h, ruas que concentram sinistros noturnos (CTTU) ficam mais restritas para quem anda ou pedala"><i class="pt ${transito.turno_simulado ? "pt-s-sim" : "pt-m"}"></i>Noite: <b>risco noturno${transito.turno_simulado ? " (simulado)" : ""}</b></span>`
       : "") +
+    (estado.dados.condicoes.simulado
+      ? `<a class="c" href="${esc(location.pathname)}" title="Voltar às condições medidas agora">usar condições reais</a>` : "") +
     `<span class="c atualizado" title="As opções são recalculadas a cada minuto">atualizado às ${esc((estado.dados.gerado_em || "").slice(0, 5))}</span>`;
 }
 
@@ -420,12 +450,16 @@ function buscar(silencioso){
     ? idCard(anterior.cards[estado.selecionada]) : null;
   const idRecomendadoAntes = anterior ? idCard(anterior.cards.find(c => c.recomendado) || anterior.cards[0]) : null;
 
-  api(`/api/opcoes?origem=${o}&destino=${d}&acessivel=${estado.acessivel ? 1 : 0}`)
+  const extra = consulta().toString();
+  try { history.replaceState(null, "", linkDaViagem()); } catch(e){}
+  api(`/api/opcoes?origem=${o}&destino=${d}${extra ? "&" + extra : ""}`)
     .then(r => {
-      if (silencioso && ($("selOrigem").value !== o || $("selDestino").value !== d)) return;
+      if (silencioso && ($("selOrigem").value !== o || $("selDestino").value !== d
+                         || consulta().toString() !== extra)) return;
       estado.dados = r;
       estado.ultimaBusca = Date.now();
       if (r.condicoes) renderCondicoes();
+      renderBateria();
       if (r.erro) {
         $("opcoes").innerHTML = `<li class="erro">${esc(r.erro)}</li>`;
         $("sugestao").textContent = ""; $("ctaNome").textContent = ""; $("ctaPreco").textContent = "";
@@ -559,6 +593,35 @@ $("btnAcessivel").addEventListener("click", e => {
   renderAcesso();
   buscar();                 // a acessibilidade muda o grafo: recalcula no servidor
 });
+/* Bateria do carro eletrico: muda o grafo (o carro nao roda o que a carga nao
+   cobre), entao recalcula no servidor. */
+function renderBateria(){
+  const b = estado.dados && estado.dados.bateria, el = $("bateriaTxt");
+  el.hidden = !b;
+  if (!b) return;
+  el.textContent = b.texto;
+  el.classList.toggle("falta", !b.alcanca);
+}
+$("selBateria").addEventListener("change", e => {
+  estado.bateria = e.target.value;
+  try { localStorage.setItem("rsm-bateria", estado.bateria); } catch(e2){}
+  buscar();
+});
+
+$("btnCompartilhar").addEventListener("click", ev => {
+  const b = ev.currentTarget;
+  const url = location.origin + linkDaViagem();
+  const r = estado.dados && estado.dados.cards && estado.dados.cards[estado.selecionada];
+  const texto = r
+    ? `${estado.dados.origem_nome} → ${estado.dados.destino_nome}: ${r.resumo}, ${minutosTxt(variante(r).tempo + minutosAcesso())}, ${brl(variante(r).custo)}`
+    : "Rotas sustentáveis na Região Metropolitana do Recife";
+  const copiado = () => { b.textContent = "Link copiado"; setTimeout(() => { b.textContent = "Compartilhar"; }, 2000); };
+  if (navigator.share) { navigator.share({ title:"RSM", text:texto, url }).catch(() => {}); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText)
+    navigator.clipboard.writeText(url).then(copiado).catch(() => prompt("Copie o link:", url));
+  else prompt("Copie o link:", url);
+});
+
 $("cta").addEventListener("click", () => {
   if (movel()) { snap = MEIO; setY(MEIO); }
   desenhar(true);
@@ -571,6 +634,19 @@ api("/api/rede").then(rede => {
   const o = $("selOrigem"), d = $("selDestino");
   rede.pontos.forEach(p => { o.add(new Option(p.nome, p.id)); d.add(new Option(p.nome, p.id)); });
   o.value = rede.origem_padrao; d.value = rede.destino_padrao;
+  // consulta guardada no endereco (link compartilhado ou pagina recarregada)
+  const ids = new Set(rede.pontos.map(p => p.id));
+  const de = urlInicial.get("de"), para = urlInicial.get("para");
+  if (ids.has(de)) o.value = de;
+  if (ids.has(para)) d.value = para;
+  if (urlInicial.get("acessivel") === "1") {
+    estado.acessivel = true; $("btnAcessivel").setAttribute("aria-pressed", "true");
+  }
+  let bat = urlInicial.get("bateria");
+  if (bat === null) { try { bat = localStorage.getItem("rsm-bateria"); } catch(e){} }
+  if ([...$("selBateria").options].some(x => x.value === bat)) {
+    estado.bateria = bat; $("selBateria").value = bat;
+  }
   o.addEventListener("change", () => { estado.local.o = null; renderAcesso(); buscar(false); });
   d.addEventListener("change", () => { estado.local.d = null; renderAcesso(); buscar(false); });
   buscar(false);

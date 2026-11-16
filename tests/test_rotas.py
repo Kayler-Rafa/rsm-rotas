@@ -542,5 +542,164 @@ class TestContramao(unittest.TestCase):
                 self.assertFalse(any(s.get("contramao") for s in c["segmentos"]))
 
 
+class TestAutonomia(unittest.TestCase):
+    """Bateria do carro eletrico: o carro nunca roda o que a carga nao cobre."""
+
+    @staticmethod
+    def _pernas_de_carro(rota):
+        """[(km rodados de carro, recarga feita logo depois?)], na ordem."""
+        pernas, km = [], 0.0
+        for s in rota["segmentos"]:
+            if s["tipo"] == "deslocamento" and s["modo"] == "carro":
+                km += s["dist_km"]
+            elif s["tipo"] == "recarga":
+                pernas.append((km, s["ponto"]))
+                km = 0.0
+        pernas.append((km, None))
+        return pernas
+
+    def test_carro_nunca_roda_mais_que_a_bateria(self):
+        import rede_rsm
+        for o, d in PARES:
+            for pct in (12, 15, 17, 25, 60):
+                alcance = rede_rsm.autonomia_km(pct)
+                r = motor.opcoes_de_viagem(o, d, bateria_pct=pct)
+                self.assertNotIn("erro", r)
+                rotas = [c for c in r["cards"]] + [
+                    c["variante_recarga"] for c in r["cards"] if c.get("variante_recarga")]
+                for rota in rotas:
+                    with self.subTest(o=o, d=d, pct=pct, rota=rota["resumo"]):
+                        carga = alcance
+                        for km, eletroposto in self._pernas_de_carro(rota):
+                            self.assertLessEqual(km, carga + 0.05)
+                            if eletroposto:
+                                rec = rede_rsm.RECARGA_POR_PONTO[eletroposto]
+                                carga = min(rede_rsm.AUTONOMIA_MAXIMA_KM,
+                                            carga - km + rede_rsm.ganho_recarga_km(rec))
+
+    def test_bateria_que_sobra_nao_muda_as_opcoes(self):
+        # Informar uma carga que cobre a viagem nao pode alterar nenhum card.
+        for o, d in PARES[:2]:
+            sem = motor.opcoes_de_viagem(o, d)
+            com = motor.opcoes_de_viagem(o, d, bateria_pct=100)
+            self.assertTrue(com["bateria"]["alcanca"])
+            self.assertEqual([(c["resumo"], c["tempo"], c["custo"]) for c in sem["cards"]],
+                             [(c["resumo"], c["tempo"], c["custo"]) for c in com["cards"]])
+
+    def test_bateria_curta_obriga_a_parada(self):
+        # Se -> Piedade sao 22,4 km de carro; 15% dao ~13 km. Ir de carro so
+        # com recarga, num card proprio, e nenhum card vai direto de carro.
+        r = motor.opcoes_de_viagem("se_olinda", "igreja_piedade", bateria_pct=15)
+        self.assertFalse(r["bateria"]["alcanca"])
+        self.assertTrue(r["bateria"]["recarga_obrigatoria"])
+        com_parada = [c for c in r["cards"] if "carro_recarga" in c["perfis_id"]]
+        self.assertEqual(len(com_parada), 1)
+        self.assertEqual(com_parada[0]["recargas"], 1)
+        self.assertTrue(set(com_parada[0]["modos"]) <= {"carro", "pe"})
+        for c in r["cards"]:
+            if set(c["modos"]) <= {"carro", "pe"} and c["usa_carro"]:
+                self.assertEqual(c["recargas"], 1, c["resumo"])
+
+    def test_sem_carga_o_carro_proprio_some(self):
+        # Na reserva (10%) a autonomia e zero: nenhum card usa o carro proprio,
+        # e ainda assim ha opcoes.
+        r = motor.opcoes_de_viagem("se_olinda", "igreja_piedade", bateria_pct=10)
+        self.assertTrue(r["cards"])
+        self.assertFalse(any(c["usa_carro"] for c in r["cards"]))
+
+
+class TestSimulacao(unittest.TestCase):
+
+    def test_condicao_simulada_e_marcada_como_simulada(self):
+        r = motor.opcoes_de_viagem("se_olinda", "igreja_piedade",
+                                   simular={"clima": "chuva_forte", "turno": "noite"})
+        self.assertEqual(r["condicoes"]["clima"]["clima"], "chuva_forte")
+        self.assertTrue(r["condicoes"]["clima"]["simulado"])
+        self.assertTrue(r["condicoes"]["simulado"])
+        self.assertEqual(r["turno"], "noite")
+        # o transito nao foi pedido: continua sendo o estimado
+        self.assertNotIn("simulado", r["condicoes"]["transito"])
+
+    def test_valor_desconhecido_nao_simula_nada(self):
+        r = motor.opcoes_de_viagem("se_olinda", "igreja_piedade",
+                                   simular={"clima": "neve"})
+        self.assertNotIn("simulado", r["condicoes"]["clima"])
+        self.assertFalse(r["condicoes"].get("simulado"))
+
+
+class TestServidor(unittest.TestCase):
+    """O servidor HTTP de verdade, numa porta livre."""
+
+    @classmethod
+    def setUpClass(cls):
+        import threading
+        from http.server import ThreadingHTTPServer
+        import server
+        cls.srv = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        cls.base = "http://127.0.0.1:%d" % cls.srv.server_address[1]
+        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.srv.shutdown()
+        cls.srv.server_close()
+
+    def _get(self, caminho):
+        import json
+        import urllib.error
+        import urllib.request
+        try:
+            with urllib.request.urlopen(self.base + caminho, timeout=60) as r:
+                status, tipo, corpo = r.status, r.headers.get("Content-Type", ""), r.read()
+        except urllib.error.HTTPError as e:
+            status, tipo, corpo = e.code, e.headers.get("Content-Type", ""), e.read()
+        dados = json.loads(corpo) if "json" in tipo and "manifest" not in tipo else None
+        return status, tipo, dados
+
+    def test_paginas_e_manifest(self):
+        self.assertEqual(self._get("/")[0], 200)
+        self.assertEqual(self._get("/admin")[0], 200)
+        status, tipo, _ = self._get("/manifest.webmanifest")
+        self.assertEqual(status, 200)
+        self.assertIn("application/manifest+json", tipo)   # sem isso o PWA nao instala
+
+    def test_nao_serve_arquivo_fora_de_web(self):
+        for caminho in ("/../src/server.py", "/..%2Fsrc%2Fserver.py",
+                        "/%2e%2e/projeto.md", "/../web/../CLAUDE.md"):
+            with self.subTest(caminho=caminho):
+                self.assertEqual(self._get(caminho)[0], 404)
+
+    def test_erros_da_api_sao_json(self):
+        status, _, dados = self._get("/api/nao-existe")
+        self.assertEqual(status, 404)
+        self.assertIn("erro", dados)
+        status, _, dados = self._get("/api/opcoes?origem=pina&destino=pina")
+        self.assertEqual(status, 400)
+        self.assertIn("erro", dados)
+        status, _, dados = self._get("/api/proximo?lat=abc&lon=1")
+        self.assertEqual(status, 400)
+        status, _, dados = self._get("/api/proximo?lat=-200&lon=1")
+        self.assertEqual(status, 400)
+
+    def test_opcoes_com_bateria_e_simulacao(self):
+        status, _, r = self._get("/api/opcoes?origem=se_olinda&destino=igreja_piedade"
+                                 "&bateria=15&transito=congestionado")
+        self.assertEqual(status, 200)
+        self.assertEqual(r["bateria"]["pct"], 15)
+        self.assertTrue(r["condicoes"]["transito"]["simulado"])
+        # bateria invalida e ignorada, nao vira erro 500
+        for ruim in ("abc", "-5", "250", "nan"):
+            status, _, r = self._get("/api/opcoes?origem=se_olinda"
+                                     "&destino=igreja_piedade&bateria=" + ruim)
+            self.assertEqual(status, 200, ruim)
+            self.assertIsNone(r["bateria"], ruim)
+
+    def test_rede_tem_o_que_a_interface_usa(self):
+        _, _, rede = self._get("/api/rede")
+        self.assertEqual(len(rede["pontos"]), 30)
+        self.assertIn(rede["origem_padrao"], {p["id"] for p in rede["pontos"]})
+        self.assertTrue(rede["recargas"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -43,6 +43,16 @@ def _bool(params, chave, padrao=False):
     return v.lower() in ("1", "true", "sim", "on", "yes")
 
 
+def _bateria(params):
+    """Carga do carro eletrico em %, ou None se nao informada ou invalida."""
+    bruto = (params.get("bateria") or [""])[0]
+    try:
+        v = float(bruto)
+    except ValueError:
+        return None
+    return v if 0 <= v <= 100 else None      # NaN tambem cai aqui
+
+
 def _opcoes(params) -> Opcoes:
     """Monta as opcoes do usuario a partir da query string.
 
@@ -82,7 +92,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _arquivo(self, caminho_rel):
         caminho = os.path.normpath(os.path.join(WEB, caminho_rel.lstrip("/")))
-        if not caminho.startswith(WEB) or not os.path.isfile(caminho):
+        # WEB + separador: so "startswith(WEB)" aceitaria uma pasta irma
+        # chamada "web-qualquer-coisa".
+        if not caminho.startswith(WEB + os.sep) or not os.path.isfile(caminho):
             self.send_error(404, "Nao encontrado")
             return
         tipo, _ = mimetypes.guess_type(caminho)
@@ -146,10 +158,15 @@ class Handler(BaseHTTPRequestHandler):
             if rota == "/api/opcoes":
                 if origem == destino:
                     return self._json({"erro": "Origem e destino sao o mesmo ponto."}, 400)
+                # clima, transito e turno so entram se vierem na consulta: e o
+                # modo de demonstracao, e a resposta os marca como simulados.
+                simular = {k: params[k][0] for k in ("clima", "transito", "turno")
+                           if params.get(k)}
                 return self._json(motor.opcoes_de_viagem(
                     origem, destino, acessivel=_bool(params, "acessivel"),
                     normalizacao=norm,
-                    evitar_inseguros=_bool(params, "evitar_inseguros", True)))
+                    evitar_inseguros=_bool(params, "evitar_inseguros", True),
+                    bateria_pct=_bateria(params), simular=simular))
 
             if rota == "/api/rota":
                 if origem == destino:
@@ -202,16 +219,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(motor.nsga2_resultado(
                     origem, destino, _opcoes(params), perfil))
 
+            if rota.startswith("/api/"):
+                # o app le JSON de tudo o que esta em /api/; a pagina 404 em
+                # HTML do servidor quebraria o tratamento de erro dele
+                return self._json({"erro": "Rota de API desconhecida: %s" % rota}, 404)
+
             return self._arquivo(rota)
 
-        except BrokenPipeError:
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             return
         except Exception as exc:                       # noqa: BLE001
             traceback.print_exc()
             return self._json({"erro": "%s: %s" % (type(exc).__name__, exc)}, 500)
 
     def log_message(self, fmt, *args):                 # silencia o log padrao
-        if "/api/" in (args[0] if args else ""):
+        # args[0] e a linha da requisicao, mas send_error passa o codigo (int):
+        # sem o str(), todo 404 de arquivo estourava aqui e virava 500.
+        if "/api/" in str(args[0] if args else ""):
             sys.stderr.write("  %s\n" % (fmt % args))
 
 

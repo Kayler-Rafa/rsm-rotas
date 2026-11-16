@@ -18,7 +18,8 @@ import geometria
 import seguranca
 from motor import _coords, _motivo_sem_rota, descrever_rota, nos_destino
 from rede_rsm import (
-    MODOS, PERFIS, PONTO_POR_ID, GrafoMultimodal, No, Opcoes, construir_grafo,
+    BATERIA_KWH, CLIMAS, MODOS, PERFIS, PONTO_POR_ID, RESERVA_BATERIA_PCT,
+    TRANSITOS, GrafoMultimodal, No, Opcoes, autonomia_km, construir_grafo,
     haversine_km, propriedades,
 )
 
@@ -157,9 +158,17 @@ ROTULO_TRANSPORTE_PUBLICO = "Transporte público"
 MODOS_TRANSPORTE_PUBLICO = frozenset({"pe", "onibus", "metro"})
 
 
+# Card fora dos perfis: o carro proprio quando a bateria informada nao cobre a
+# viagem direta e a unica forma de ir de carro e parando para recarregar.
+PERFIL_CARRO_RECARGA = "carro_recarga"
+ROTULO_CARRO_RECARGA = "Recarga no caminho"
+
+
 def _rotulo_perfil(perfil_id: str) -> str:
     if perfil_id == PERFIL_TRANSPORTE_PUBLICO:
         return ROTULO_TRANSPORTE_PUBLICO
+    if perfil_id == PERFIL_CARRO_RECARGA:
+        return ROTULO_CARRO_RECARGA
     return str(PERFIS[perfil_id]["rotulo"])
 
 
@@ -404,7 +413,7 @@ def _variante_recarga(origem_id: str, destino_id: str, op: Opcoes,
     """A mesma viagem de carro proprio, com a parada de recarga que menos atrasa."""
     op_rec = Opcoes(modos=frozenset({"pe", "carro"}), clima=op.clima,
                     transito=op.transito, acessivel=op.acessivel, recarga=True,
-                    turno=op.turno)
+                    turno=op.turno, autonomia_km=op.autonomia_km)
     g = construir_grafo(op_rec, origem_id, destino_id)
     origem: No = (origem_id, "pe", 0, 0)
     destinos = nos_destino(g, destino_id, True)
@@ -453,10 +462,69 @@ def _transporte_publico(origem_id: str, destino_id: str, op: Opcoes,
     return _card(PERFIL_TRANSPORTE_PUBLICO, rota, cond)
 
 
+def _simular(cond: Dict[str, object], simular: Optional[Dict[str, str]]) -> None:
+    """Troca clima, transito ou turno medidos por valores escolhidos (modo de
+    demonstracao). Tudo o que for trocado fica marcado como "simulado" - o app
+    nunca apresenta uma condicao escolhida a mao como se fosse medida."""
+    if not simular:
+        return
+    c, t = cond["clima"], cond["transito"]              # type: ignore[index]
+    if simular.get("clima") in CLIMAS:
+        c.update({"clima": simular["clima"], "simulado": True,    # type: ignore[union-attr]
+                  "descricao": "condição simulada", "calor": False})
+    if simular.get("transito") in TRANSITOS:
+        t.update({"transito": simular["transito"], "simulado": True,  # type: ignore[union-attr]
+                  "motivo": "condição simulada"})
+    if simular.get("turno") in ("dia", "noite"):
+        t.update({"turno": simular["turno"], "turno_simulado": True})  # type: ignore[union-attr]
+    cond["simulado"] = bool(c.get("simulado") or t.get("simulado")     # type: ignore[union-attr]
+                            or t.get("turno_simulado"))                # type: ignore[union-attr]
+
+
+def _km(v: float) -> str:
+    return ("%.1f" % v).replace(".", ",")
+
+
+def _resumo_bateria(bateria_pct: float, origem_id: str, destino_id: str,
+                    cards: List[Dict[str, object]],
+                    recarga: Optional[Dict[str, object]]) -> Dict[str, object]:
+    """O que a carga informada significa para ESTA viagem, em uma frase."""
+    alcance = autonomia_km(bateria_pct)
+    direto = geometria.carro(origem_id, destino_id)
+    direto_km = round(direto[0], 1) if direto else None
+    alcanca = direto_km is not None and direto_km <= alcance
+    base = "Bateria em %d%%: cerca de %s km de autonomia" % (
+        round(bateria_pct), _km(alcance))
+    if direto_km is None:
+        texto = base + "."
+    elif alcanca:
+        texto = "%s, suficiente para os %s km de carro." % (base, _km(direto_km))
+    elif recarga is not None:
+        parada = next((s["local"] for s in recarga["segmentos"]   # type: ignore[union-attr]
+                       if s["tipo"] == "recarga"), "eletroposto")
+        texto = ("%s, e o trajeto de carro tem %s km. Para ir de carro é preciso "
+                 "parar para recarregar (%s)." % (base, _km(direto_km), parada))
+    elif any(c["usa_carro"] for c in cards):
+        texto = ("%s, e o trajeto de carro tem %s km. Nenhum eletroposto da rede "
+                 "fica ao alcance; o carro só aparece até uma estação próxima."
+                 % (base, _km(direto_km)))
+    else:
+        texto = ("%s, e o trajeto de carro tem %s km. Nenhum eletroposto da rede "
+                 "fica ao alcance: as opções abaixo não usam o carro próprio."
+                 % (base, _km(direto_km)))
+    return {"pct": bateria_pct, "autonomia_km": round(alcance, 1),
+            "direto_km": direto_km, "alcanca": alcanca,
+            "recarga_obrigatoria": bool(not alcanca and recarga is not None),
+            "capacidade_kwh": BATERIA_KWH, "reserva_pct": RESERVA_BATERIA_PCT,
+            "texto": texto}
+
+
 def opcoes_de_viagem(origem_id: str, destino_id: str,
                      acessivel: bool = False,
                      normalizacao: str = "minmax",
-                     evitar_inseguros: bool = True) -> Dict[str, object]:
+                     evitar_inseguros: bool = True,
+                     bateria_pct: Optional[float] = None,
+                     simular: Optional[Dict[str, str]] = None) -> Dict[str, object]:
     """Resposta do app do usuario: as cinco opcoes de viagem, mais o contexto.
 
     Para cards que usam o carro eletrico proprio, calcula tambem a variante
@@ -464,6 +532,7 @@ def opcoes_de_viagem(origem_id: str, destino_id: str,
     usuario, e a troca no card nao dispara uma nova consulta.
     """
     cond = clima_mod.condicoes_atuais()
+    _simular(cond, simular)
     op = Opcoes(
         modos=frozenset(MODOS),
         clima=str(cond["clima"]["clima"]),             # type: ignore[index]
@@ -471,6 +540,7 @@ def opcoes_de_viagem(origem_id: str, destino_id: str,
         acessivel=acessivel,
         evitar_inseguros=evitar_inseguros,
         turno=str(cond["transito"].get("turno", "dia")),   # type: ignore[union-attr]
+        autonomia_km=None if bateria_pct is None else autonomia_km(bateria_pct),
     )
 
     g = construir_grafo(op, origem_id, destino_id)
@@ -489,7 +559,7 @@ def opcoes_de_viagem(origem_id: str, destino_id: str,
     if evitar_inseguros:
         op_bruto = Opcoes(modos=op.modos, clima=op.clima, transito=op.transito,
                           acessivel=op.acessivel, evitar_inseguros=False,
-                          turno=op.turno)
+                          turno=op.turno, autonomia_km=op.autonomia_km)
         g_bruto = construir_grafo(op_bruto, origem_id, destino_id)
         destinos_bruto = nos_destino(g_bruto, destino_id)
         if origem in g_bruto.adj and destinos_bruto:
@@ -508,19 +578,37 @@ def opcoes_de_viagem(origem_id: str, destino_id: str,
     if tp is not None:
         por_perfil[PERFIL_TRANSPORTE_PUBLICO] = tp
 
-    if any(x["usa_carro"] for x in por_perfil.values()):
+    variante = None
+    if bateria_pct is not None or any(x["usa_carro"] for x in por_perfil.values()):
         variante = _variante_recarga(origem_id, destino_id, op, cond)
-        if variante is not None:
-            for card in por_perfil.values():
-                if card["usa_carro"]:
-                    card["_variante_recarga"] = variante
+    recarga_obrigatoria = None
+    if variante is not None:
+        # Com a bateria informada, o interruptor so vale para a viagem que vai
+        # de carro ate o destino: num park-and-ride (carro + metro) a variante
+        # "so carro com parada" seria outra viagem.
+        com_interruptor = [
+            c for c in por_perfil.values() if c["usa_carro"]
+            and (bateria_pct is None or set(c["modos"]) <= {"carro", "pe"})]  # type: ignore[arg-type]
+        for card in com_interruptor:
+            card["_variante_recarga"] = variante
+        # Bateria informada e nenhuma viagem so de carro coube nela: ir de carro
+        # so com a parada. Vira um card proprio, e nao um interruptor, porque
+        # nao existe a versao "sem parar".
+        if bateria_pct is not None and not com_interruptor:
+            recarga_obrigatoria = dict(variante, perfil=PERFIL_CARRO_RECARGA,
+                                       rotulo=ROTULO_CARRO_RECARGA)
+            recarga_obrigatoria["avisos"] = list(variante["avisos"]) + [{   # type: ignore[call-overload]
+                "nivel": "aviso", "texto":
+                "Parada obrigatória: com %d%% de bateria o carro não chega ao "
+                "destino sem recarregar." % round(bateria_pct)}]
+            por_perfil[PERFIL_CARRO_RECARGA] = recarga_obrigatoria
 
     # Perfis diferentes caem com frequencia na MESMA rota - com todos os modais
     # ligados, o carro costuma vencer tempo, custo e esforco ao mesmo tempo.
     # Mostrar tres cards identicos seria ruido; o card vira a rota, e as
     # prioridades que ela atende viram etiquetas dentro dele.
     ordem = ["mais_rapida", "menor_custo", "menor_emissao", "menos_esforco",
-             "equilibrada", PERFIL_TRANSPORTE_PUBLICO]
+             "equilibrada", PERFIL_TRANSPORTE_PUBLICO, PERFIL_CARRO_RECARGA]
     cards: List[Dict[str, object]] = []
     indice: Dict[str, Dict[str, object]] = {}
     for pid in ordem:
@@ -562,7 +650,11 @@ def opcoes_de_viagem(origem_id: str, destino_id: str,
     # o card sugerido vem primeiro; o resto por tempo, como num app de corrida
     cards.sort(key=lambda x: (not x["recomendado"], x["tempo"]))
 
+    bateria = (None if bateria_pct is None else
+               _resumo_bateria(bateria_pct, origem_id, destino_id, cards,
+                               recarga_obrigatoria))
     return {
+        "bateria": bateria,
         "origem": origem_id,
         "destino": destino_id,
         "origem_nome": PONTO_POR_ID[origem_id].nome,

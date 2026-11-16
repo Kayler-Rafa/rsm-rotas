@@ -75,6 +75,12 @@ o app devolve as opções em cards — como um aplicativo de corrida.
 - **O app sugere um e explica em uma frase**; quem escolhe é você. Sob chuva
   forte ele sugere a opção abrigada e avisa nos cards expostos que não é hora de
   pedalar. No pico, sugere o que não depende do trânsito.
+- **Bateria do carro elétrico:** informe a carga e o app não manda o carro
+  além do que ela alcança. Se não dá para chegar, o carro só aparece com a
+  parada obrigatória em um eletroposto que a bateria alcança ("Recarga no
+  caminho"), ou até uma estação próxima.
+- **Link da viagem:** o endereço guarda origem, destino e opções; o botão
+  *Compartilhar* manda a mesma consulta para outra pessoa.
 - **Parada para recarregar** aparece como interruptor no card que usa o carro
   elétrico próprio, com o custo em tempo e dinheiro ao lado. Você decide. A
   variante já vem calculada, então a troca é instantânea.
@@ -184,6 +190,16 @@ A tela recalcula as opções **a cada minuto** (só com a aba visível) e manté
 opção que você escolheu. Se a sugestão mudar, por exemplo porque começou a
 chover ou entrou a hora de pico, o texto avisa.
 
+## Modo de demonstração
+
+Para mostrar como o app reage sem esperar chover ou anoitecer, acrescente as
+condições ao endereço — por exemplo
+<http://localhost:8000/?clima=chuva_forte&transito=congestionado&turno=noite>.
+Valores: `clima` = `bom`, `chuva_leve`, `chuva_forte`; `transito` = `livre`,
+`normal`, `congestionado`; `turno` = `dia`, `noite`. O que for trocado aparece
+na barra como **simulado**, nunca como medido. `bateria=15` simula o carro com
+15% de carga.
+
 ## Condições automáticas
 
 | O quê | Fonte | Natureza |
@@ -212,7 +228,7 @@ rotas/
 │   ├── motor.py       consulta, rota, cards do app e análise de viabilidade
 │   └── server.py      servidor HTTP (biblioteca padrão)
 ├── tests/
-│   └── test_rotas.py  36 testes de corretude das rotas, dos algoritmos e da segurança
+│   └── test_rotas.py  47 testes de corretude das rotas, dos algoritmos, da segurança e do servidor
 ├── dados/
 │   ├── matriz_carro.json   distância e tempo de carro entre os 30 pontos (OSRM)
 │   ├── geometria.json      traçados reais (OSRM)
@@ -235,7 +251,7 @@ em cada modal.
 
 | Rota | Parâmetros | Retorna |
 |---|---|---|
-| `GET /api/opcoes` | `origem`, `destino`, `acessivel` | condições medidas, os cards e qual é recomendado |
+| `GET /api/opcoes` | `origem`, `destino`, `acessivel`, `bateria` (0–100); demonstração: `clima`, `transito`, `turno` | condições medidas, os cards e qual é recomendado |
 | `GET /api/condicoes-atuais` | `forcar` | clima e trânsito correntes |
 
 **Da análise técnica:**
@@ -447,8 +463,9 @@ Estes números são **estimativa**, não medição:
   pago da Joy Energy = rápido, 25 min). Onde o OSM marca `fee=no`, a energia é
   gratuita; nos demais, R$ 22 / R$ 26 estimados. Disponibilidade não é
   consultada.
-- A autonomia do veículo elétrico não é modelada: a recarga é uma parada que o
-  usuário pede, não uma necessidade calculada a partir de bateria e distância.
+- A autonomia do carro elétrico é modelada com parâmetros fixos: bateria de
+  40 kWh, 0,15 kWh/km e reserva de 10% (100% ≈ 240 km). Não é o carro do
+  usuário, e o consumo não varia com trânsito nem ar-condicionado.
 - O tempo típico de via é o fluxo livre do OSRM × 1,647 (índice TomTom de
   64,7% para o Recife). Os fatores por cima disso — trânsito livre ×0,75,
   congestionado ×1,45, chuva — são multiplicadores por ordem de grandeza, não

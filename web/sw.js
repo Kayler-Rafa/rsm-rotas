@@ -4,7 +4,7 @@
    - /api/*: sempre rede. Rota com clima e trânsito velhos é rota errada; sem
      rede, devolve um erro em JSON que o app já sabe mostrar.
    - Tiles do mapa: não passam por aqui (são milhares; o navegador cuida). */
-const VERSAO = "rsm-v1";
+const VERSAO = "rsm-v2";
 const CASCA = [
   "/",
   "/app.css",

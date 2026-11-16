@@ -43,7 +43,8 @@ KWH_POR_KM_CARRO = 0.15
 #   01/02/2026 (reajuste de 4,46% aprovado pelo CSTM; Arpe arredondou 4,47 -> 4,50).
 #   A Etapa 1 usava R$ 4,10.
 # Metro: CBTU Recife, R$ 4,25 - ultima referencia publica e de jan/2025, sem
-#   reajuste de 2026 encontrado. Reverificar no gov.br/cbtu.
+#   reajuste de 2026 encontrado (nova busca em 2026-11-16, idem). Confirmar
+#   no gov.br/cbtu.
 # A troca direta onibus <-> metro continua isenta (integracao VEM, ver
 # MODOS_INTEGRADOS).
 TARIFA_ONIBUS = 4.50
@@ -284,6 +285,34 @@ def _carregar_recargas() -> List[Recarga]:
 
 RECARGAS: List[Recarga] = _carregar_recargas()
 
+# ------------------------------------------------------------------ autonomia
+# Bateria do carro eletrico proprio. O usuario informa a carga (%); o modelo
+# converte em quilometros e NAO deixa o carro percorrer o que a bateria nao
+# alcanca. Parametros de um compacto eletrico tipico vendido no Brasil
+# (38-45 kWh); o consumo e o mesmo KWH_POR_KM_CARRO usado na emissao.
+# Sao parametros de produto, nao medicao do veiculo do usuario.
+BATERIA_KWH = 40.0
+RESERVA_BATERIA_PCT = 10.0      # ninguem planeja chegar com 0%
+
+
+def autonomia_km(bateria_pct: float) -> float:
+    """Quilometros que a carga informada permite rodar, guardada a reserva."""
+    util = max(0.0, min(100.0, float(bateria_pct)) - RESERVA_BATERIA_PCT)
+    return util / 100.0 * BATERIA_KWH / KWH_POR_KM_CARRO
+
+
+AUTONOMIA_MAXIMA_KM = autonomia_km(100.0)
+
+# Duracao da carga em si (sem o desvio ate o eletroposto), por tipo.
+MINUTOS_DE_CARGA = {"rapido": 25.0, "semirrapido": 50.0}
+
+
+def ganho_recarga_km(rec: "Recarga") -> float:
+    """Quilometros que a parada devolve a bateria: potencia x tempo de carga."""
+    minutos = min(rec.tempo_min, MINUTOS_DE_CARGA.get(rec.tipo, rec.tempo_min))
+    return rec.potencia_kw * minutos / 60.0 / KWH_POR_KM_CARRO
+
+
 # Modo que o usuario recarrega por conta propria. O carro de aplicativo nao
 # entra: quem cuida da carga e o motorista, nao o passageiro.
 MODO_RECARREGAVEL = "carro"
@@ -504,6 +533,9 @@ class Opcoes:
     # "dia" ou "noite" (seguranca.turno_da_hora). A noite, ruas que concentram
     # sinistros noturnos ficam mais restritas; de dia vale o total do periodo.
     turno: str = "dia"
+    # Quilometros que a bateria do carro proprio ainda roda (autonomia_km).
+    # None = nao informada: o carro nao e limitado (comportamento anterior).
+    autonomia_km: Optional[float] = None
 
     @property
     def recarga_efetiva(self) -> bool:
@@ -840,6 +872,36 @@ def pode_desembarcar(p: Ponto, modo: str, destino_id: str) -> bool:
 RECARGA_POR_PONTO: Dict[str, Recarga] = {r.ponto: r for r in RECARGAS}
 
 
+def _bateria_alcanca(op: Opcoes, origem_id: str, u: str, r: int,
+                     dist_km: float) -> bool:
+    """A bateria do carro proprio cobre esta perna?
+
+    O carro proprio so embarca na origem e so anda por arestas-atalho, entao a
+    carga em cada vertice e DETERMINADA pela estrutura, sem precisar de mais um
+    componente de estado:
+      R=0  a perna sai da origem com a autonomia informada;
+      R=1  a perna sai de um eletroposto u, onde o carro chegou com
+           autonomia - d(origem, u) e recebeu ganho_recarga_km(u), limitado a
+           bateria cheia.
+    Aresta que a carga nao cobre nao entra no grafo: a restricao de autonomia
+    vira estrutural, como o bit R, e Dijkstra/A*/Martins seguem inalterados.
+    """
+    if op.autonomia_km is None:
+        return True
+    carga = op.autonomia_km
+    if u != origem_id:
+        import geometria
+        ate = geometria.carro(origem_id, u)
+        carga -= ate[0] if ate else haversine_km(PONTO_POR_ID[origem_id],
+                                                 PONTO_POR_ID[u]) * 1.35
+        if carga < 0:
+            return False              # nem chega ate aqui
+    rec = RECARGA_POR_PONTO.get(u)
+    if r == 1 and rec is not None:
+        carga = min(AUTONOMIA_MAXIMA_KM, carga + ganho_recarga_km(rec))
+    return dist_km <= carga + 1e-9
+
+
 def construir_grafo(opcoes: Optional[Opcoes] = None,
                     origem_id: str = "se_olinda",
                     destino_id: str = "igreja_piedade") -> GrafoMultimodal:
@@ -917,7 +979,11 @@ def construir_grafo(opcoes: Optional[Opcoes] = None,
             if u == v:
                 continue
             for r in recs:
-                g.add_aresta((u, modo, 1, r), custo_atalho(u, v, modo, cen, 1, r))
+                a = custo_atalho(u, v, modo, cen, 1, r)
+                if modo == MODO_RECARREGAVEL and not _bateria_alcanca(
+                        op, origem_id, u, r, a.dist_km):
+                    continue
+                g.add_aresta((u, modo, 1, r), a)
 
     # 2) Arestas de transferencia (troca de camada modal no mesmo ponto)
     for p in PONTOS:

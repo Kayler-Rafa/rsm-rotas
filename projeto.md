@@ -4,12 +4,12 @@ Documento de handoff. Descreve o que existe, por que cada decisão foi tomada, o
 que está em aberto e onde mexer. Quem continuar o trabalho deve **atualizar este
 arquivo junto com o código** e **rodar os testes antes de declarar algo pronto**.
 
-Última atualização: 2026-11-09 (PWA instalável no celular e arquivos de
-deploy; ver §9b).
+Última atualização: 2026-11-16 (autonomia do carro elétrico, modo de
+demonstração, link compartilhável e correção do 404 do servidor; ver §9d).
 
 ```bash
 python src/server.py                          # app em http://localhost:8000, técnico em /admin
-python -m unittest discover -s tests -v       # 36 testes de corretude (~2 min)
+python -m unittest discover -s tests -v       # 47 testes de corretude (~2 min)
 python src/geometria.py                       # rebaixa matriz e traçados do OSRM (rede mudou)
 python src/geometria.py --bike-legal          # só as distâncias legais de bike (aviso de contramão)
 python src/seguranca.py                       # rebaixa sinistros da CTTU e comprimentos do OSM
@@ -435,7 +435,7 @@ rápido; real, do OSM, a 270 m do ponto — 2 min de desvio somados à carga).
 
 ## 7. Testes (`tests/test_rotas.py`)
 
-36 testes, stdlib `unittest`, ~2 min. Cada um verifica uma **propriedade** que tem
+47 testes, stdlib `unittest`, ~2 min. Cada um verifica uma **propriedade** que tem
 de valer, não um número copiado da saída:
 
 | Teste | Garante |
@@ -467,6 +467,13 @@ de valer, não um número copiado da saída:
 | `test_amostra_pequena_fica_na_media` | 1 caso noturno não vira ×3; fator nunca < 1 |
 | `test_caso_real_domingos_ferreira_de_bicicleta` | df_norte → df_centro de bike: ok de dia, atenção à noite |
 | `test_ninguem_anda_ou_pedala_em_via_insegura_a_noite` | grafo noturno não tem aresta exposta em trecho inseguro à noite |
+| `test_carro_nunca_roda_mais_que_a_bateria` | 6 pares × 5 cargas: nenhuma perna de carro (antes ou depois da recarga) passa da carga disponível |
+| `test_bateria_que_sobra_nao_muda_as_opcoes` | informar 100% devolve exatamente os mesmos cards |
+| `test_bateria_curta_obriga_a_parada` | Sé → Piedade com 15%: card "Recarga no caminho", uma parada, e nenhum card só-carro sem parada |
+| `test_sem_carga_o_carro_proprio_some` | na reserva (10%) nenhum card usa o carro próprio e ainda há opções |
+| `test_condicao_simulada_e_marcada_como_simulada` | o que foi simulado vem marcado; o que não foi pedido continua medido/estimado |
+| `test_valor_desconhecido_nao_simula_nada` | `clima=neve` é ignorado |
+| `TestServidor` (5 testes) | servidor real numa porta livre: páginas e MIME do manifest, nada fora de `web/` é servido, erro de API é JSON (404/400), bateria inválida é ignorada, `/api/rede` tem o que a interface usa |
 
 Varredura completa feita uma vez (não está na suíte por tempo): **870 pares ×
 3 trânsitos, A\* = Dijkstra em todos; Martins contém o ótimo em 60 pares × 4
@@ -481,8 +488,10 @@ mão única). É o roteador acertando.
 
 Parâmetros comuns: `origem`, `destino`, `perfil`, `modos`, `clima`, `transito`,
 `seguranca`, `acessivel`, `recarga`. `/api/opcoes` aceita também
-`evitar_inseguros` (padrão 1) e devolve `evitados`, `seguranca_fonte`,
-`gerado_em` e, em cada card, `seguranca` e `evitou`.
+`evitar_inseguros` (padrão 1), `bateria` (0–100, carga do carro elétrico) e,
+para demonstração, `clima`, `transito` e `turno`; devolve `evitados`,
+`seguranca_fonte`, `gerado_em`, `bateria` e, em cada card, `seguranca` e
+`evitou`. Rota desconhecida em `/api/` responde 404 **em JSON**.
 
 | Rota | Uso |
 |---|---|
@@ -605,6 +614,67 @@ Capacitor), não reescreva.
 **Também na mesma rodada:** `motor.py` dividido — núcleo em `motor.py`, opções do
 app em `src/cards.py`; `motor.opcoes_de_viagem` reexportado no fim de `motor.py`.
 
+## 9d. Autonomia, demonstração, link e servidor (2026-11-16)
+
+**Autonomia do carro elétrico** (`rede_rsm.autonomia_km`, `_bateria_alcanca`).
+O usuário informa a carga (%) no app; `Opcoes.autonomia_km` leva isso ao grafo.
+
+- Parâmetros de produto: bateria de **40 kWh** (`BATERIA_KWH`, compacto
+  típico), consumo de 0,15 kWh/km (o mesmo da emissão), **reserva de 10%**
+  (`RESERVA_BATERIA_PCT`). Autonomia = (carga − 10%) × 40 ÷ 0,15: 100% →
+  240 km, 20% → 26,7 km, 15% → 13,3 km, 10% → 0.
+- **A restrição é estrutural, sem novo componente no vértice.** O carro próprio
+  só embarca na origem e só anda por arestas-atalho, então a carga em cada
+  vértice é determinada pela estrutura: em R=0 saiu da origem com a autonomia
+  informada (menos d(origem, u) se u é um eletroposto); em R=1 saiu de um
+  eletroposto onde chegou com o que sobrou e recebeu
+  `ganho_recarga_km` = potência × minutos de carga ÷ consumo (22 kW × 50 min →
+  122 km; 50 kW × 25 min → 139 km), limitado à bateria cheia. Aresta que a carga
+  não cobre **não entra no grafo**. |V| não cresce e Dijkstra/A\*/Martins não
+  mudam. Se um dia o carro puder fazer várias pernas, isso deixa de valer e a
+  carga tem de virar estado (problema de caminho mínimo com restrição de
+  recurso).
+- **Cards** (`cards.opcoes_de_viagem(bateria_pct=...)`): se a bateria cobre a
+  viagem, nada muda (testado). Se não cobre, some o card só-carro e aparece o
+  card **"Recarga no caminho"** (perfil `carro_recarga`, fora de `PERFIS`): a
+  mesma variante de recarga, agora obrigatória, com a parada que menos atrasa
+  **entre as que a bateria alcança**. O *park-and-ride* até uma estação próxima
+  continua valendo. Sem eletroposto ao alcance, o carro próprio some e o texto
+  diz por quê. A resposta traz `bateria` (`pct`, `autonomia_km`, `direto_km`,
+  `alcanca`, `recarga_obrigatoria`, `texto`).
+- Sé → Piedade (22,4 km): ≥ 20% vai direto; 15–19% para no Joy Energy (Pina, a
+  11,8 km); ≤ 14% não alcança nenhum eletroposto.
+- Não modela: consumo variando com trânsito/ar-condicionado, degradação, nem o
+  modelo do carro do usuário. Carro de app não é limitado (a carga é problema
+  do motorista).
+
+**Modo de demonstração.** `/?clima=chuva_forte&transito=congestionado&turno=noite`
+(qualquer subconjunto) troca a condição medida por uma escolhida, para mostrar
+de dia e com sol como o app reage. `cards._simular` marca cada item trocado com
+`simulado` (ou `turno_simulado`), a barra de condições mostra **"simulado"** no
+lugar de "medido/estimado" e oferece "usar condições reais". Valor desconhecido
+é ignorado. Não reintroduz os botões bom/chuva do artifact: sem o parâmetro na
+URL, tudo continua medido.
+
+**Link da viagem.** O endereço guarda a consulta (`de`, `para`, `acessivel`,
+`bateria` e as condições simuladas) via `history.replaceState`; recarregar ou
+abrir o link reproduz a mesma viagem. Botão **Compartilhar** no rodapé
+(`navigator.share` no celular, área de transferência no desktop). A posição do
+GPS **não** vai no link. A bateria também fica em `localStorage`.
+
+**Servidor.**
+- **Bug corrigido:** todo arquivo inexistente devolvia **500** em vez de 404.
+  `send_error` chama `log_message` com o código (int) em `args[0]`, e o filtro
+  `"/api/" in args[0]` estourava com `TypeError`. Ninguém via porque o app nunca
+  pede arquivo que não existe; os testes HTTP novos pegaram.
+- Checagem de pasta: `startswith(WEB + os.sep)` em vez de `startswith(WEB)`,
+  que aceitaria uma pasta irmã `web-algo`.
+- `/api/<desconhecida>` → 404 em JSON (antes caía no servidor de arquivos e
+  devolvia HTML, que o `r.json()` do app não lê).
+- `ConnectionResetError`/`ConnectionAbortedError` tratados como o
+  `BrokenPipeError` (no Windows é o que vem quando a aba fecha no meio).
+- `sw.js`: `VERSAO` → `rsm-v2`.
+
 ## 10. O que falta
 
 - **Não há dado aberto de segurança pública (assalto, roubo) por rua na RMR.**
@@ -632,10 +702,17 @@ app em `src/cards.py`; `motor.opcoes_de_viagem` reexportado no fim de `motor.py`
 - ~~Acessibilidade proxy~~ — medida no OSM (§9c). O índice de segurança por modal
   (`seguranca` na API, usado no custo de desconforto) também é *proxy*. O
   **filtro** de vias perigosas usa dado real (seção 4b).
-- Tarifas atualizadas em 2026-11-09: ônibus R$ 4,50 (Bilhete Único, desde
-  01/02/2026, confirmada); metrô R$ 4,25 (CBTU, referência de jan/2025, **a
-  reverificar**). A troca ônibus ⇄ metrô segue isenta (integração VEM).
-- Autonomia do carro elétrico não é modelada.
+- Tarifas: ônibus R$ 4,50 (Bilhete Único, desde 01/02/2026, confirmada); metrô
+  R$ 4,25 (CBTU, referência de jan/2025). Nova busca em 2026-11-16 não achou
+  reajuste do metrô em 2026 nem página oficial com o valor vigente: continua
+  **a confirmar na bilheteria ou no gov.br/cbtu**. A troca ônibus ⇄ metrô segue
+  isenta (integração VEM).
+- ~~Autonomia do carro elétrico não é modelada~~ — feita (§9d). Falta o consumo
+  real (trânsito, ar-condicionado) e o modelo do carro do usuário.
+- O botão **"Escolher …"** só recentraliza o mapa: não há navegação curva a
+  curva nem acompanhamento da viagem. É o próximo passo natural do produto.
+- O modo de demonstração só existe pela URL; o `/admin` não tem atalhos para
+  ele.
 - Rotas a pé e de bike vêm do FOSSGIS, que exclui `trunk`. Onde a rota de carro
   foi usada no lugar, o traçado pode incluir um trecho de mão única que o
   pedestre faria pelo outro lado da avenida. Um OSRM próprio com perfil ajustado
